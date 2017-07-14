@@ -9,6 +9,7 @@ from __init__ import TestCaseSuppressOutput, TestBase
 
 log = logging.getLogger(__name__)
 
+
 class TestTemplate(TestCaseSuppressOutput, TestBase):
 
     def testExit01(self):

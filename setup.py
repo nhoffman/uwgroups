@@ -26,6 +26,7 @@ class CheckVersion(Command):
         assert stored_version == git_version
         print 'the current version is', stored_version
 
+
 subprocess.call(
     ('mkdir -p mkvenv/data && '
      'git describe --tags --dirty > uwgroups/data/ver.tmp '

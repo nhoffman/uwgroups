@@ -9,7 +9,6 @@ import pkgutil
 import sys
 from importlib import import_module
 from uwgroups import subcommands, __version__ as version, __doc__ as docstring
-from uwgroups.utils import Opener
 
 
 def parse_arguments(argv):
@@ -30,7 +29,7 @@ def parse_arguments(argv):
                         action='store_const', dest='verbosity', const=0,
                         help='Suppress output')
     parser.add_argument('--logfile', default=sys.stderr,
-                        type=Opener('w'), metavar='FILE',
+                        type=argparse.FileType('w'), metavar='FILE',
                         help='Write logging messages to FILE [default stderr]')
 
     ##########################
