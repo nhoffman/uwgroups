@@ -14,9 +14,6 @@ GWS_HOST = 'iam-ws.u.washington.edu'
 GWS_PORT = 7443
 API_PATH = '/group_sws/v2'
 
-KEY_FILE = 'newkey-decrypted.pem'
-CERT_FILE = 'elmira.pem'
-
 # https://certs.cac.washington.edu/?req=svpem
 UWCA_ROOT = package_data('root.cert')
 
@@ -42,7 +39,7 @@ class UWGroups(object):
     def close(self):
         self.connection.close()
 
-    def raw_request(self, method, endpoint, headers={'accept': 'text/xml'}):
+    def raw_request(self, method, endpoint, headers=None):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
             raise ValueError('method must be one of {}'.format(', '.join(methods)))
@@ -60,7 +57,7 @@ class UWGroups(object):
 
     def get_members(self, group_name):
         endpoint = 'group/{group_name}/member'.format(group_name=group_name)
-        response = self.raw_request('GET', endpoint)
+        response = self.raw_request('GET', endpoint, headers={'accept': 'text/xml'})
         root = ET.fromstring(response)
         members = [member.text for member in root.iter('member')]
         return members
