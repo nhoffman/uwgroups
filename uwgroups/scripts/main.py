@@ -8,7 +8,9 @@ import logging
 import pkgutil
 import sys
 from importlib import import_module
-from uwgroups import subcommands, __version__ as version, __doc__ as docstring
+from uwgroups import (subcommands, __version__ as version,
+                      __doc__ as docstring,
+                      cert_var_name, key_var_name)
 
 
 def parse_arguments(argv):
@@ -31,6 +33,15 @@ def parse_arguments(argv):
     parser.add_argument('--logfile', default=sys.stderr,
                         type=argparse.FileType('w'), metavar='FILE',
                         help='Write logging messages to FILE [default stderr]')
+
+    parser.add_argument('-c', '--cert-file',
+                        help="""Path to the RSA private key file. May
+                        also be specified using the environment variable
+                        {}""".format(cert_var_name))
+    parser.add_argument('-k', '--key-file',
+                        help="""Path to the PEM representation of the
+                        certificate. May also be specified using the
+                        environment variable {}""".format(key_var_name))
 
     ##########################
     # Setup all sub-commands #

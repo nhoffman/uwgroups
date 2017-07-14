@@ -37,9 +37,9 @@ subprocess.call(
 from uwgroups import __version__
 package_data = glob.glob('data/*')
 
-params = {'author': 'Your name',
-          'author_email': 'Your email',
-          'description': 'Package description',
+params = {'author': 'Noah Hoffman',
+          'author_email': 'ngh2@uw.edu',
+          'description': 'UW Groups API',
           'name': 'uwgroups',
           'packages': find_packages(),
           'package_dir': {'uwgroups': 'uwgroups'},
@@ -47,9 +47,12 @@ params = {'author': 'Your name',
               'console_scripts': ['uwgroups = uwgroups.scripts.main:main']
           },
           'version': __version__,
+          'install_requires': [
+              'Jinja2>=2.8',
+          ],
           'package_data': {'uwgroups': package_data},
           'test_suite': 'tests',
-          'cmdclass': {'check_version': CheckVersion}
+          'cmdclass': {'version': CheckVersion}
           }
 
 setup(**params)

@@ -1,13 +1,15 @@
 """
-Package description (in uwgroups/__init__.py)
-
-Update me!
+UW Groups API
 """
 
 import glob
 from os import path
 
 _data = path.join(path.dirname(__file__), 'data')
+
+
+cert_var_name = 'UWGROUPS_CERT'
+key_var_name = 'UWGROUPS_KEY'
 
 
 def package_data(fname, pattern=None):
