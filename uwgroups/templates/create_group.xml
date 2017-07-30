@@ -1,0 +1,60 @@
+<gws class="gws" version="2">
+
+  <group class="group" version="2">
+
+    {# <xsrf class="xsrf"></xsrf> #}
+    {# <regid class="regid">db85ceba62904506829ccab97c395c28</regid> #}
+    <name class="name">{{ group_name }}</name>
+    <title class="title">{{ group_name }}</title>
+    <description class="description">{{ group_name }}</description>
+
+    {# <createtime class="createtime">1476828404054</createtime> #}
+    {# <modifytime class="modifytime">1476828404346</modifytime> #}
+    {# <membermodifytime class="membermodifytime">1476889278051</membermodifytime> #}
+
+    {# <contact class="contact">ngh2</contact> #}
+
+    <authnfactor class="authnfactor">1</authnfactor>
+    <classification class="classification">u</classification>
+    {# <dependson class="dependson"></dependson> #}
+
+    {# <gid class="gid">387980</gid> #}
+
+    {# <affiliates class="affiliates"> #}
+    {#   <affiliate class="affiliate" name="netid" #}
+    {# 		 status="active" forward="{{ group_name }}@exchange.washington.edu" /> #}
+    {# </affiliates> #}
+
+    {# <emailenabled class="emailenabled">uwexchange</emailenabled> #}
+    {# <publishemail class="publishemail">{{ group_name }}@uw.edu</publishemail> #}
+
+    {# <reporttoowner class="reporttoowner">no</reporttoowner> #}
+
+    {# <authorigs class="authorigs"> #}
+    {#   <authorig class="authorig" type="group">{{ group_name }}</authorig> #}
+    {# </authorigs> #}
+
+    <admins class="admins">
+      {% for user in admins %}
+      <admin class="admin" type="{{ user.type }}">{{ user.uwnetid }}</admin>
+      {% endfor %}
+    </admins>
+
+    <updaters class="updaters">
+    </updaters>
+
+    <creators class="creators">
+    </creators>
+
+    <readers class="readers">
+      {# <reader class="reader" type="none" name="EveryEntity">dc=all</reader> #}
+    </readers>
+
+    <optins class="optins">
+    </optins>
+
+    <optouts class="optouts">
+    </optouts>
+
+  </group>
+</gws>

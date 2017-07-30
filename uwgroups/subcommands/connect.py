@@ -1,4 +1,4 @@
-"""Test a connection
+"""Create a connection - useful mainly for testing credentials
 """
 
 import logging
@@ -16,3 +16,10 @@ def build_parser(parser):
 def action(args):
     key, cert = find_credentials(args)
     conn = UWGroups(key, cert)
+
+    for attr in ['host', 'port', 'key_file', 'cert_file']:
+        print('{}: {}'.format(attr, getattr(conn.connection, attr)))
+
+    print('admin users defined by cert: {}'.format(conn.admins))
+
+    print 'ok'

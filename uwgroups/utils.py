@@ -39,3 +39,18 @@ def mkdir(dirpath, clobber=False):
         raise OSError('Failed to create %s' % dirpath)
 
     return dirpath
+
+
+def reconcile(current, desired):
+    """
+    Return sets (to_add, to_remove).
+    """
+
+    for obj in current, desired:
+        if not isinstance(obj, set):
+            raise TypeError('"current" and "desired" must be sets')
+
+    to_remove = current - desired
+    to_add = desired - current
+
+    return to_add, to_remove
