@@ -28,7 +28,7 @@ class CheckVersion(Command):
 
 
 subprocess.call(
-    ('mkdir -p mkvenv/data && '
+    ('mkdir -p uwgroups/data && '
      'git describe --tags --dirty > uwgroups/data/ver.tmp '
      '&& mv uwgroups/data/ver.tmp uwgroups/data/ver '
      '|| rm -f uwgroups/data/ver.tmp'),

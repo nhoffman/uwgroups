@@ -1,5 +1,5 @@
 """
-UW Groups API
+CLI for the UW Groups API
 """
 
 import glob
