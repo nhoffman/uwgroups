@@ -4,6 +4,7 @@ import httplib
 from os import path
 import xml.etree.ElementTree as ET
 import subprocess
+import time
 
 from jinja2 import Environment, PackageLoader
 
@@ -21,8 +22,20 @@ API_PATH = '/group_sws/v2'
 UWCA_ROOT = package_data('root.cert')
 
 
+class APIError(Exception):
+    pass
+
+
+class MissingResourceError(APIError):
+    pass
+
+
+class AuthorizationError(APIError):
+    pass
+
+
 def get_admins(cert):
-    """Returns (dns_user, uwnetid_user) given data in cert
+    """Returns [dns_user, uwnetid_user] given data in cert
 
     """
 
@@ -34,7 +47,7 @@ def get_admins(cert):
     dns_user = User(uwnetid=data['CN'], type='dns')
     uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
 
-    return (dns_user, uwnetid_user)
+    return [dns_user, uwnetid_user]
 
 
 class User(object):
@@ -63,18 +76,21 @@ class UWGroups(object):
         if not cert or not path.exists(cert):
             raise ValueError("'cert' must be defined and must specify a readable file")
 
-        context = httplib.ssl.create_default_context()
-        context.load_verify_locations(UWCA_ROOT)
-        self.connection = httplib.HTTPSConnection(
-            GWS_HOST, GWS_PORT, key, cert, context=context)
-        log.info('connected to {}:{}'.format(GWS_HOST, GWS_PORT))
-
+        self.key = key
+        self.cert = cert
         self.j2env = Environment(loader=PackageLoader('uwgroups', 'templates'))
-
         self.admins = get_admins(cert)
         log.info(self.admins)
 
+    def connect(self):
+        self.context = httplib.ssl.create_default_context()
+        self.context.load_verify_locations(UWCA_ROOT)
+        self.connection = httplib.HTTPSConnection(
+            GWS_HOST, GWS_PORT, self.key, self.cert, context=self.context)
+        log.info('connected to {}:{}'.format(GWS_HOST, GWS_PORT))
+
     def __enter__(self):
+        self.connect()
         return self
 
     def __exit__(self, type, value, tback):
@@ -82,6 +98,10 @@ class UWGroups(object):
 
     def close(self):
         self.connection.close()
+
+    def reset(self):
+        self.close()
+        self.connect()
 
     def raw_request(self, method, endpoint, headers=None, body=None,
                     expect_status=200):
@@ -102,15 +122,23 @@ class UWGroups(object):
         response = self.connection.getresponse()
         log.info('{} {}'.format(response.status, response.reason))
 
-        if response.status != expect_status:
-            raise ValueError('{}: {}'.format(url, response.reason))
+        msg = '{}: {} {}'.format(url, response.status, response.reason)
+
+        if response.status == 404:
+            raise MissingResourceError(msg)
+        elif response.status == 401:
+            raise AuthorizationError(msg)
+        elif response.status != expect_status:
+            raise APIError(msg)
 
         body = response.read()
         return body
 
     def get_members(self, group_name):
         endpoint = 'group/{group_name}/member'.format(group_name=group_name)
+
         response = self.raw_request('GET', endpoint, headers={'accept': 'text/xml'})
+
         root = ET.fromstring(response)
         members = [member.text for member in root.iter('member')]
         return members
@@ -159,19 +187,33 @@ class UWGroups(object):
         response = self.raw_request('DELETE', endpoint)
         return response
 
-    def sync_group(self, group_name, members, dry_run=False):
+    def sync_members(self, group_name, members, dry_run=False):
         """Define members for group_name, adding and removing users as
         necessary.
 
         """
 
         desired_members = set(members)
-        current_members = set(self.get_members(group_name))
+
+        try:
+            current_members = set(self.get_members(group_name))
+        except MissingResourceError:
+            # It seems to be necessary to prevent an
+            # httplib.ResponseNotReady error after exception caused by
+            # missing group by closing and reopening the connection.
+            self.reset()
+            log.warning('creating group {}'.format(group_name))
+            self.create_group(group_name)
+            current_members = set(self.get_members(group_name))
+
         to_add, to_delete = reconcile(current_members, desired_members)
 
-        log.info('{} add: {}'.format(group_name, ','.join(to_add)))
-        log.info('{} del: {}'.format(group_name, ','.join(to_delete)))
+        if to_add:
+            log.info('[+] {}: {}'.format(group_name, ','.join(to_add)))
+            if not dry_run:
+                self.add_members(group_name, sorted(to_add))
 
-        if not dry_run:
-            self.add_members(group_name, to_add)
-            self.delete_members(group_name, to_delete)
+        if to_delete:
+            log.info('[-] {}: {}'.format(group_name, ','.join(to_delete)))
+            if not dry_run:
+                self.delete_members(group_name, sorted(to_delete))
