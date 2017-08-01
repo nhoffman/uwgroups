@@ -1,6 +1,7 @@
 import os
 import logging
 import shutil
+import xml.dom.minidom
 
 from os import path
 
@@ -54,3 +55,8 @@ def reconcile(current, desired):
     to_add = desired - current
 
     return to_add, to_remove
+
+
+def prettify(xmlstr):
+    pretty = xml.dom.minidom.parseString(xmlstr).toprettyxml(indent="    ")
+    return '\n'.join(line.rstrip() for line in pretty.splitlines() if line.strip())

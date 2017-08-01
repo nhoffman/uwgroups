@@ -4,12 +4,11 @@ import httplib
 from os import path
 import xml.etree.ElementTree as ET
 import subprocess
-import time
 
 from jinja2 import Environment, PackageLoader
 
 from uwgroups import package_data
-from uwgroups.utils import reconcile
+from uwgroups.utils import reconcile, prettify
 
 log = logging.getLogger(__name__)
 
@@ -105,14 +104,12 @@ class UWGroups(object):
         self.close()
         self.connect()
 
-    def raw_request(self, method, endpoint, headers=None, body=None,
-                    expect_status=200):
+    def request(self, method, endpoint, headers=None, body=None, expect_status=200):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
             raise ValueError('method must be one of {}'.format(', '.join(methods)))
 
         url = path.join(API_PATH, endpoint)
-        log.info(url)
 
         args = {}
         if headers:
@@ -122,9 +119,9 @@ class UWGroups(object):
 
         self.connection.request(method, url, **args)
         response = self.connection.getresponse()
-        log.info('{} {}'.format(response.status, response.reason))
 
-        msg = '{}: {} {}'.format(url, response.status, response.reason)
+        msg = '{} {}: {} {}'.format(method, url, response.status, response.reason)
+        log.info(msg)
 
         if response.status == 404:
             raise MissingResourceError(msg)
@@ -136,10 +133,43 @@ class UWGroups(object):
         body = response.read()
         return body
 
+    def get_group(self, group_name):
+        endpoint = 'group/{group_name}'.format(group_name=group_name)
+        response = self.request(
+            'GET', endpoint,
+            headers={"Accept": "text/xml", "Content-Type": "text/xml"})
+
+        return prettify(response)
+
+    def create_group(self, group_name, admins=None):
+        extra_admins = admins or []
+        for admin in extra_admins:
+            if not isinstance(admin, User):
+                raise TypeError('admins must be User instances')
+
+        template = self.j2env.get_template('create_group.xml')
+        body = template.render(
+            group_name=group_name,
+            admins=self.admins + extra_admins)
+        log.info(prettify(body))
+        endpoint = 'group/{group_name}'.format(group_name=group_name)
+        response = self.request(
+            'PUT', endpoint,
+            headers={"Accept": "text/xml", "Content-Type": "text/xml"},
+            body=body,
+            expect_status=201)
+        log.info(prettify(response))
+        return response
+
+    def delete_group(self, group_name):
+        endpoint = 'group/{group_name}'.format(group_name=group_name)
+        response = self.request('DELETE', endpoint)
+        return response
+
     def get_members(self, group_name):
         endpoint = 'group/{group_name}/member'.format(group_name=group_name)
 
-        response = self.raw_request('GET', endpoint, headers={'accept': 'text/xml'})
+        response = self.request('GET', endpoint, headers={'accept': 'text/xml'})
 
         root = ET.fromstring(response)
         members = [member.text for member in root.iter('member')]
@@ -152,7 +182,7 @@ class UWGroups(object):
         endpoint = 'group/{group_name}/member/{members}'.format(
             group_name=group_name, members=','.join(members))
 
-        response = self.raw_request('PUT', endpoint)
+        response = self.request('PUT', endpoint)
         return response
 
     def delete_members(self, group_name, members):
@@ -162,31 +192,7 @@ class UWGroups(object):
         endpoint = 'group/{group_name}/member/{members}'.format(
             group_name=group_name, members=','.join(members))
 
-        response = self.raw_request('DELETE', endpoint)
-        return response
-
-    def create_group(self, group_name, admins=None):
-        extra_admins = admins or []
-        for admin in extra_admins:
-            if not isinstance(admin, User):
-                raise TypeError('admins must be User instances')
-
-        template = self.j2env.get_template('create_group.xml')
-        body = template.render(
-            group_name=group_name,
-            admins=self.admins + extra_admins)
-        log.debug(body)
-        endpoint = 'group/{group_name}'.format(group_name=group_name)
-        response = self.raw_request(
-            'PUT', endpoint,
-            headers={"Accept": "text/xml", "Content-Type": "text/xml"},
-            body=body,
-            expect_status=201)
-        return response
-
-    def delete_group(self, group_name):
-        endpoint = 'group/{group_name}'.format(group_name=group_name)
-        response = self.raw_request('DELETE', endpoint)
+        response = self.request('DELETE', endpoint)
         return response
 
     def sync_members(self, group_name, members, dry_run=False):
@@ -200,14 +206,15 @@ class UWGroups(object):
         try:
             current_members = set(self.get_members(group_name))
         except MissingResourceError:
-            # It seems to be necessary to prevent an
-            # httplib.ResponseNotReady error after exception caused by
-            # missing group by closing and reopening the connection.
+            # closing and reopening the connection seems to be
+            # necessary to prevent an httplib.ResponseNotReady error
+            # after an exception caused by a missing group.
             self.reset()
             log.warning('creating group {}'.format(group_name))
             self.create_group(group_name)
             current_members = set(self.get_members(group_name))
 
+        log.info('current members: {}'.format(current_members))
         to_add, to_delete = reconcile(current_members, desired_members)
 
         if to_add:
