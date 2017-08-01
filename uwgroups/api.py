@@ -65,28 +65,30 @@ class User(object):
 
 
 class UWGroups(object):
-    def __init__(self, key, cert):
+    def __init__(self, certfile, keyfile=None):
         """Initialize the connection. key and cert are paths to the key and
         certificate files, respectively.
 
         """
-        if not key or not path.exists(key):
-            raise ValueError("'key' must be defined and must specify a readable file")
 
-        if not cert or not path.exists(cert):
-            raise ValueError("'cert' must be defined and must specify a readable file")
+        if not certfile or not path.exists(certfile):
+            raise ValueError("'certfile' is required and must specify a readable file")
 
-        self.key = key
-        self.cert = cert
+        if keyfile and not path.exists(keyfile):
+            raise ValueError("'keyfile' must specify a readable file")
+
+        self.keyfile = keyfile
+        self.certfile = certfile
         self.j2env = Environment(loader=PackageLoader('uwgroups', 'templates'))
-        self.admins = get_admins(cert)
+        self.admins = get_admins(certfile)
         log.info(self.admins)
 
     def connect(self):
         self.context = httplib.ssl.create_default_context()
+        self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
         self.connection = httplib.HTTPSConnection(
-            GWS_HOST, GWS_PORT, self.key, self.cert, context=self.context)
+            GWS_HOST, GWS_PORT, context=self.context)
         log.info('connected to {}:{}'.format(GWS_HOST, GWS_PORT))
 
     def __enter__(self):

@@ -33,7 +33,7 @@ repo::
 
 or::
 
-   % path/to/ungapatchka/uwgroups.py --help
+   % path/to/uwgroups/uwgroups.py --help
 
 When invoked this way, the local version of the package is imported,
 even if the version of the package is installed to the system. This is
@@ -46,6 +46,35 @@ required or optional "arguments". The name of the script, the action,
 and options and their arguments are entered on the command line
 separated by spaces. Help text is available for both the ``uwgroups``
 script and individual actions using the ``-h`` or ``--help`` options.
+
+authentication
+==============
+
+Authentication to the UW Groups API uses SSL/TLS authentication with
+an X.509 certificate in pem format along with the private key used to
+generate it. The certificate and key may be concatenated into the same
+file, for example::
+
+  -----BEGIN RSA PRIVATE KEY-----
+  <key contents>
+  -----END RSA PRIVATE KEY-----
+  -----BEGIN CERTIFICATE-----
+  <cert contents>
+  -----END CERTIFICATE-----
+
+In this case, the concatenated key and cert can either be specified on
+the command line using ``-c/--cert-file`` before the name of the
+subcommand::
+
+  uwgroups -c certfile.pem connect
+
+or using the environment variable ``UWGROUPS_CERT``::
+
+  export UWGROUPS_CERT=certfile.pem
+  uwgroups connect
+
+The key may also be provided in a separate fie using ``-k/--key-file``
+or ``UWGROUPS_KEY`` as above.
 
 unit tests
 ==========

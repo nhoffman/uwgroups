@@ -14,12 +14,13 @@ def build_parser(parser):
 
 
 def action(args):
-    key, cert = find_credentials(args)
-    with UWGroups(key, cert) as conn:
-        for attr in ['host', 'port', 'key_file', 'cert_file']:
+    certfile, keyfile = find_credentials(args)
+    with UWGroups(certfile, keyfile) as conn:
+        for attr in ['host', 'port']:
             print('{}: {}'.format(attr, getattr(conn.connection, attr)))
+        for attr in ['certfile', 'keyfile']:
+            print('{}: {}'.format(attr, getattr(conn, attr)))
 
         print('admin users defined by cert: {}'.format(conn.admins))
 
         print 'ok'
-        print(dir(conn.connection))

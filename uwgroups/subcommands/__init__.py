@@ -20,30 +20,24 @@ def itermodules(subcommands_path, root=__name__):
 
 def find_credentials(args):
     """Defines key and cert files from command line arguments or
-    environment variables (the former has precedence). Returns tuple
-    of paths (key, cert) with values of None if not found.
+    environment variables (the command line has precedence). Returns
+    tuple of paths (certfile, keyfile) with values of None if not
+    found.
 
     """
 
-    key = args.key_file
-    if key:
-        log.info('argument --key-file={}'.format(key))
-    elif key_var_name in os.environ:
-        key = os.environ[key_var_name]
-        log.info('environment variable {}={}'.format(key_var_name, key))
-    else:
-        log.warning(
-            'no key file specified using either --key-file or {}'.format(key_var_name))
-
-    cert = args.cert_file
-    if cert:
-        log.info('argument --cert-file={}'.format(cert))
+    certfile = args.cert_file
+    if certfile:
+        log.info('argument --cert-file={}'.format(certfile))
     elif cert_var_name in os.environ:
-        cert = os.environ[cert_var_name]
-        log.info('environment variable {}={}'.format(cert_var_name, cert))
-    else:
-        log.warning(
-            'no cert file specified using either --cert-file or {}'.format(
-                cert_var_name))
+        certfile = os.environ[cert_var_name]
+        log.info('environment variable {}={}'.format(cert_var_name, certfile))
 
-    return key, cert
+    keyfile = args.key_file
+    if keyfile:
+        log.info('argument --key-file={}'.format(keyfile))
+    elif key_var_name in os.environ:
+        keyfile = os.environ[key_var_name]
+        log.info('environment variable {}={}'.format(key_var_name, keyfile))
+
+    return certfile, keyfile

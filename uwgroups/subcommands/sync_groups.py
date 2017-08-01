@@ -16,9 +16,9 @@ def build_parser(parser):
 def action(args):
     group_name = 'u_labmed_removeme2'
 
-    key, cert = find_credentials(args)
+    certfile, keyfile = find_credentials(args)
 
     members = ['ngh2', 'jerrydav', 'rclayton']
 
-    with UWGroups(key, cert) as conn:
+    with UWGroups(certfile, keyfile) as conn:
         conn.sync_members(group_name, members, dry_run=False)
