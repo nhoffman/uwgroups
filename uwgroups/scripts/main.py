@@ -35,13 +35,15 @@ def parse_arguments(argv):
                         help='Write logging messages to FILE [default stderr]')
 
     parser.add_argument('-c', '--cert-file',
+                        help="""Path to the PEM representation of the
+                        certificate. The file path can also be
+                        specified using the environment variable
+                        {}. May contain the private key as well, in
+                        which case -k/--keyfile is optional.""".format(key_var_name))
+    parser.add_argument('-k', '--key-file',
                         help="""Path to the RSA private key file. May
                         also be specified using the environment variable
                         {}""".format(cert_var_name))
-    parser.add_argument('-k', '--key-file',
-                        help="""Path to the PEM representation of the
-                        certificate. May also be specified using the
-                        environment variable {}""".format(key_var_name))
 
     ##########################
     # Setup all sub-commands #
