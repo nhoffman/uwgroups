@@ -13,7 +13,6 @@ from uwgroups.utils import reconcile, prettify
 
 log = logging.getLogger(__name__)
 
-
 GWS_HOST = 'iam-ws.u.washington.edu'
 GWS_PORT = 7443
 API_PATH = '/group_sws/v2'
@@ -119,7 +118,8 @@ class UWGroups(object):
         self.close()
         self.connect()
 
-    @check_types(method=str, endpoint=str, headers=dict, body=str, expect_status=int)
+    @check_types(method=basestring, endpoint=basestring, headers=dict,
+                 body=basestring, expect_status=int)
     def request(self, method, endpoint, headers=None, body=None, expect_status=200):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
@@ -149,7 +149,7 @@ class UWGroups(object):
         body = response.read()
         return body
 
-    @check_types(group_name=str)
+    @check_types(group_name=basestring)
     def get_group(self, group_name):
         endpoint = path.join('group', group_name)
         response = self.request(
@@ -158,7 +158,7 @@ class UWGroups(object):
 
         return prettify(response)
 
-    @check_types(group_name=str, admins=list)
+    @check_types(group_name=basestring, admins=list)
     def create_group(self, group_name, admins=None):
         endpoint = path.join('group', group_name)
         extra_admins = admins or []
@@ -180,13 +180,13 @@ class UWGroups(object):
         log.info(prettify(response))
         return response
 
-    @check_types(group_name=str)
+    @check_types(group_name=basestring)
     def delete_group(self, group_name):
         endpoint = path.join('group', group_name)
         response = self.request('DELETE', endpoint)
         return response
 
-    @check_types(group_name=str)
+    @check_types(group_name=basestring)
     def get_members(self, group_name):
         endpoint = path.join('group', group_name, 'member')
         response = self.request('GET', endpoint, headers={'accept': 'text/xml'})
@@ -194,19 +194,19 @@ class UWGroups(object):
         members = [member.text for member in root.iter('member')]
         return members
 
-    @check_types(group_name=str, members=list)
+    @check_types(group_name=basestring, members=list)
     def add_members(self, group_name, members):
         endpoint = path.join('group', group_name, 'member', ','.join(members))
         response = self.request('PUT', endpoint)
         return response
 
-    @check_types(group_name=str, members=list)
+    @check_types(group_name=basestring, members=list)
     def delete_members(self, group_name, members):
         endpoint = path.join('group', group_name, 'member', ','.join(members))
         response = self.request('DELETE', endpoint)
         return response
 
-    @check_types(group_name=str, members=list)
+    @check_types(group_name=basestring, members=list)
     def sync_members(self, group_name, members, dry_run=False):
         """Define members for group_name, adding and removing users as
         necessary.
@@ -238,3 +238,12 @@ class UWGroups(object):
             log.info('[-] {}: {}'.format(group_name, ','.join(to_delete)))
             if not dry_run:
                 self.delete_members(group_name, sorted(to_delete))
+
+    def set_affiliate(self, group_name, service, active=True):
+        services = {'exchange': 'email', 'google': 'google'}
+        if service not in services:
+            raise ValueError('service must be one of {}'.format(services.keys()))
+        endpoint = path.join('group', group_name, 'affiliate', services[service])
+        endpoint += '?status=' + ('active' if active else 'inactive')
+        response = self.request('PUT', endpoint)
+        return response

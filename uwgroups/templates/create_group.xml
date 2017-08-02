@@ -12,12 +12,6 @@
     <classification class="classification">u</classification>
     <dependson class="dependson"></dependson>
 
-    <affiliates class="affiliates">
-      <affiliate class="affiliate" forward="{{ group_name }}@exchange.washington.edu"
-		 name="netid" status="active"/>
-    </affiliates>
-
-    <emailenabled class="emailenabled">uwexchange</emailenabled>
     <publishemail class="publishemail">{{ group_name }}@uw.edu</publishemail>
 
     {# <reporttoowner class="reporttoowner">no</reporttoowner> #}
