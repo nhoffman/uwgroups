@@ -4,6 +4,7 @@ import httplib
 from os import path
 import xml.etree.ElementTree as ET
 import subprocess
+from functools import wraps
 
 from jinja2 import Environment, PackageLoader
 
@@ -33,13 +34,13 @@ class AuthorizationError(APIError):
     pass
 
 
-def get_admins(cert):
+def get_admins(certfile):
     """Returns [dns_user, uwnetid_user] given data in cert
 
     """
 
     output = subprocess.check_output(
-        ['openssl', 'x509', '-in', cert, '-noout', '-subject'])
+        ['openssl', 'x509', '-in', certfile, '-noout', '-subject'])
     log.debug(output)
     data = {k: v.strip() or None for k, v in [e.split('=') for e in output.split('/')]}
 
@@ -47,6 +48,20 @@ def get_admins(cert):
     uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
 
     return [dns_user, uwnetid_user]
+
+
+def check_types(**kwargs):
+    def actual_decorator(func):
+        @wraps(func)
+        def wrapper(*_args, **_kwargs):
+            argdict = dict(zip(func.func_code.co_varnames, _args), **_kwargs)
+            for arg, obj in kwargs.items():
+                if arg in argdict and not isinstance(argdict[arg], obj):
+                    raise TypeError('"{}" must be an instance of {}'.format(arg, obj))
+
+            return func(*_args, **_kwargs)
+        return wrapper
+    return actual_decorator
 
 
 class User(object):
@@ -104,6 +119,7 @@ class UWGroups(object):
         self.close()
         self.connect()
 
+    @check_types(method=str, endpoint=str, headers=dict, body=str, expect_status=int)
     def request(self, method, endpoint, headers=None, body=None, expect_status=200):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
@@ -133,15 +149,18 @@ class UWGroups(object):
         body = response.read()
         return body
 
+    @check_types(group_name=str)
     def get_group(self, group_name):
-        endpoint = 'group/{group_name}'.format(group_name=group_name)
+        endpoint = path.join('group', group_name)
         response = self.request(
             'GET', endpoint,
             headers={"Accept": "text/xml", "Content-Type": "text/xml"})
 
         return prettify(response)
 
+    @check_types(group_name=str, admins=list)
     def create_group(self, group_name, admins=None):
+        endpoint = path.join('group', group_name)
         extra_admins = admins or []
         for admin in extra_admins:
             if not isinstance(admin, User):
@@ -152,7 +171,7 @@ class UWGroups(object):
             group_name=group_name,
             admins=self.admins + extra_admins)
         log.info(prettify(body))
-        endpoint = 'group/{group_name}'.format(group_name=group_name)
+
         response = self.request(
             'PUT', endpoint,
             headers={"Accept": "text/xml", "Content-Type": "text/xml"},
@@ -161,40 +180,33 @@ class UWGroups(object):
         log.info(prettify(response))
         return response
 
+    @check_types(group_name=str)
     def delete_group(self, group_name):
-        endpoint = 'group/{group_name}'.format(group_name=group_name)
+        endpoint = path.join('group', group_name)
         response = self.request('DELETE', endpoint)
         return response
 
+    @check_types(group_name=str)
     def get_members(self, group_name):
-        endpoint = 'group/{group_name}/member'.format(group_name=group_name)
-
+        endpoint = path.join('group', group_name, 'member')
         response = self.request('GET', endpoint, headers={'accept': 'text/xml'})
-
         root = ET.fromstring(response)
         members = [member.text for member in root.iter('member')]
         return members
 
+    @check_types(group_name=str, members=list)
     def add_members(self, group_name, members):
-        if not isinstance(members, list):
-            raise TypeError('"members" must be a list of uwnetids')
-
-        endpoint = 'group/{group_name}/member/{members}'.format(
-            group_name=group_name, members=','.join(members))
-
+        endpoint = path.join('group', group_name, 'member', ','.join(members))
         response = self.request('PUT', endpoint)
         return response
 
+    @check_types(group_name=str, members=list)
     def delete_members(self, group_name, members):
-        if not isinstance(members, list):
-            raise TypeError('"members" must be a list of uwnetids')
-
-        endpoint = 'group/{group_name}/member/{members}'.format(
-            group_name=group_name, members=','.join(members))
-
+        endpoint = path.join('group', group_name, 'member', ','.join(members))
         response = self.request('DELETE', endpoint)
         return response
 
+    @check_types(group_name=str, members=list)
     def sync_members(self, group_name, members, dry_run=False):
         """Define members for group_name, adding and removing users as
         necessary.
