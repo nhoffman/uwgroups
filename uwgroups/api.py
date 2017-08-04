@@ -235,15 +235,17 @@ class UWGroups(object):
 
         desired_members = set(members)
 
-        if self.group_exists(group_name):
+        try:
             current_members = set(self.get_members(group_name))
-        else:
+        except MissingResourceError:
+            self.reset()
             current_members = set()
             log.warning('creating group {}'.format(group_name))
             if not dry_run:
                 self.create_group(group_name)
 
-        log.info('current members: {}'.format(current_members))
+        log.info('{} current members'.format(len(current_members)))
+        log.debug('current members: {}'.format(current_members))
         to_add, to_delete = reconcile(current_members, desired_members)
 
         if to_add:
