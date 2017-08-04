@@ -1,4 +1,4 @@
-"""Syncronize group membership
+"""Syncronize group membership, creating groups if necessary
 """
 
 from __future__ import print_function

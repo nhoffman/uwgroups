@@ -9,7 +9,7 @@ from functools import wraps
 from jinja2 import Environment, PackageLoader
 
 from uwgroups import package_data
-from uwgroups.utils import reconcile, prettify
+from uwgroups.utils import reconcile, prettify, grouper
 
 log = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ class UWGroups(object):
         body = template.render(
             group_name=group_name,
             admins=self.admins + extra_admins)
-        log.info(prettify(body))
+        log.debug(prettify(body))
 
         response = self.request(
             'PUT', endpoint,
@@ -201,17 +201,17 @@ class UWGroups(object):
         members = [member.text for member in root.iter('member')]
         return members
 
-    @check_types(group_name=basestring, members=list)
-    def add_members(self, group_name, members):
-        endpoint = path.join('group', group_name, 'member', ','.join(members))
-        response = self.request('PUT', endpoint)
-        return response
+    @check_types(group_name=basestring, members=list, batchsize=int)
+    def add_members(self, group_name, members, batchsize=200):
+        for chunk in grouper(members, batchsize):
+            endpoint = path.join('group', group_name, 'member', ','.join(chunk))
+            self.request('PUT', endpoint)
 
-    @check_types(group_name=basestring, members=list)
-    def delete_members(self, group_name, members):
-        endpoint = path.join('group', group_name, 'member', ','.join(members))
-        response = self.request('DELETE', endpoint)
-        return response
+    @check_types(group_name=basestring, members=list, batchsize=int)
+    def delete_members(self, group_name, members, batchsize=200):
+        for chunk in grouper(members, batchsize):
+            endpoint = path.join('group', group_name, 'member', ','.join(chunk))
+            self.request('DELETE', endpoint)
 
     @check_types(group_name=basestring)
     def group_exists(self, group_name):

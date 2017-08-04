@@ -2,6 +2,7 @@ import os
 import logging
 import shutil
 import xml.dom.minidom
+from itertools import izip_longest, ifilterfalse
 
 from os import path
 
@@ -60,3 +61,17 @@ def reconcile(current, desired):
 def prettify(xmlstr):
     pretty = xml.dom.minidom.parseString(xmlstr).toprettyxml(indent="    ")
     return '\n'.join(line.rstrip() for line in pretty.splitlines() if line.strip())
+
+
+def grouper(iterable, n, fill=False, fillvalue=None):
+    """Collect data into fixed-length chunks or blocks. If ``fill`` is
+    True, pad final block with ``fillvalue`` up to a length of ``n``.
+
+    """
+
+    args = [iter(iterable)] * n
+    for chunk in izip_longest(fillvalue=fillvalue, *args):
+        if fill:
+            yield chunk
+        else:
+            yield tuple(ifilterfalse(lambda x: x is None, chunk))

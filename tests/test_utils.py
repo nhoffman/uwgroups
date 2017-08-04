@@ -4,7 +4,7 @@ Test utils module.
 
 import logging
 
-from uwgroups.utils import reconcile
+from uwgroups.utils import reconcile, grouper
 
 from __init__ import TestBase, get_testfile
 log = logging.getLogger(__name__)
@@ -53,3 +53,15 @@ class TestReconcile(TestBase):
 
     def test06(self):
         self.assertRaises(TypeError, reconcile, set(), [])
+
+
+class TestGrouper(TestBase):
+    def test01(self):
+        items = range(10)
+        chunks = list(grouper(items, 4))
+        self.assertEquals(chunks[-1], (8, 9))
+
+    def test02(self):
+        items = range(10)
+        chunks = list(grouper(items, 4, fill=True))
+        self.assertEquals(chunks[-1], (8, 9, None, None))
