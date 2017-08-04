@@ -6,7 +6,7 @@ import logging
 
 from uwgroups.utils import reconcile, grouper
 
-from __init__ import TestBase, get_testfile
+from __init__ import TestBase
 log = logging.getLogger(__name__)
 
 

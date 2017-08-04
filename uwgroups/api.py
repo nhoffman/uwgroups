@@ -4,12 +4,11 @@ import httplib
 from os import path
 import xml.etree.ElementTree as ET
 import subprocess
-from functools import wraps
 
 from jinja2 import Environment, PackageLoader
 
 from uwgroups import package_data
-from uwgroups.utils import reconcile, prettify, grouper
+from uwgroups.utils import reconcile, prettify, grouper, check_types
 
 log = logging.getLogger(__name__)
 
@@ -47,20 +46,6 @@ def get_admins(certfile):
     uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
 
     return [dns_user, uwnetid_user]
-
-
-def check_types(**kwargs):
-    def actual_decorator(func):
-        @wraps(func)
-        def wrapper(*_args, **_kwargs):
-            argdict = dict(zip(func.func_code.co_varnames, _args), **_kwargs)
-            for arg, obj in kwargs.items():
-                if arg in argdict and not isinstance(argdict[arg], obj):
-                    raise TypeError('"{}" must be an instance of {}'.format(arg, obj))
-
-            return func(*_args, **_kwargs)
-        return wrapper
-    return actual_decorator
 
 
 class User(object):

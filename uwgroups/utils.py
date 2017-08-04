@@ -3,6 +3,7 @@ import logging
 import shutil
 import xml.dom.minidom
 from itertools import izip_longest, ifilterfalse
+from functools import wraps
 
 from os import path
 
@@ -43,14 +44,39 @@ def mkdir(dirpath, clobber=False):
     return dirpath
 
 
-def reconcile(current, desired):
-    """
-    Return sets (to_add, to_remove).
-    """
+def check_types(**kwargs):
+    """Decorator to enforce argument types for a function or class
+    method. Decorator arguments define objects against which
+    corresponding funcrion or method arguments wil be compared using
+    isinstance; raises TypeError if types do not match.
 
-    for obj in current, desired:
-        if not isinstance(obj, set):
-            raise TypeError('"current" and "desired" must be sets')
+    Example::
+
+        @check_types(name=basestring, times=int)
+        def hello(name, times=1):
+            for i in range(times):
+                print('hello {}'.format(name))
+
+    """
+    def actual_decorator(func):
+        @wraps(func)
+        def wrapper(*_args, **_kwargs):
+            argdict = dict(zip(func.func_code.co_varnames, _args), **_kwargs)
+            for arg, obj in kwargs.items():
+                if arg in argdict and not isinstance(argdict[arg], obj):
+                    raise TypeError('"{}" must be an instance of {}'.format(arg, obj))
+
+            return func(*_args, **_kwargs)
+        return wrapper
+    return actual_decorator
+
+
+@check_types(current=set, desired=set)
+def reconcile(current, desired):
+    """Return sets (to_add, to_remove) indicating elements that should be
+    added to or removed from ``current`` to produce ``desired``.
+
+    """
 
     to_remove = current - desired
     to_add = desired - current
@@ -63,6 +89,7 @@ def prettify(xmlstr):
     return '\n'.join(line.rstrip() for line in pretty.splitlines() if line.strip())
 
 
+@check_types(n=int, fill=bool)
 def grouper(iterable, n, fill=False, fillvalue=None):
     """Collect data into fixed-length chunks or blocks. If ``fill`` is
     True, pad final block with ``fillvalue`` up to a length of ``n``.
