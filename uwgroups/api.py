@@ -119,8 +119,9 @@ class UWGroups(object):
         self.connect()
 
     @check_types(method=basestring, endpoint=basestring, headers=dict,
-                 body=basestring, expect_status=int)
-    def request(self, method, endpoint, headers=None, body=None, expect_status=200):
+                 body=basestring, expect_status=int, attempts=int)
+    def request(self, method, endpoint, headers=None, body=None, expect_status=200,
+                attempts=3):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
             raise ValueError('method must be one of {}'.format(', '.join(methods)))
@@ -133,8 +134,15 @@ class UWGroups(object):
         if body:
             args['body'] = body
 
-        self.connection.request(method, url, **args)
-        response = self.connection.getresponse()
+        for attempt in range(attempts):
+            try:
+                self.connection.request(method, url, **args)
+                response = self.connection.getresponse()
+            except httplib.BadStatusLine, err:
+                log.warning('failure on attempt {}: {}'.format(attempt, err))
+                self.reset()
+            else:
+                break
 
         msg = '{} {}: {} {}'.format(method, url, response.status, response.reason)
         log.info(msg)
@@ -155,7 +163,6 @@ class UWGroups(object):
         response = self.request(
             'GET', endpoint,
             headers={"Accept": "text/xml", "Content-Type": "text/xml"})
-
         return prettify(response)
 
     @check_types(group_name=basestring, admins=list)
@@ -177,7 +184,7 @@ class UWGroups(object):
             headers={"Accept": "text/xml", "Content-Type": "text/xml"},
             body=body,
             expect_status=201)
-        log.info(prettify(response))
+        log.debug(prettify(response))
         return response
 
     @check_types(group_name=basestring)
@@ -206,6 +213,19 @@ class UWGroups(object):
         response = self.request('DELETE', endpoint)
         return response
 
+    @check_types(group_name=basestring)
+    def group_exists(self, group_name):
+        try:
+            self.get_group(group_name)
+        except MissingResourceError:
+            # closing and reopening the connection seems to be
+            # necessary to prevent an httplib.ResponseNotReady error
+            # after an exception caused by a missing group.
+            self.reset()
+            return False
+        else:
+            return True
+
     @check_types(group_name=basestring, members=list)
     def sync_members(self, group_name, members, dry_run=False):
         """Define members for group_name, adding and removing users as
@@ -215,16 +235,13 @@ class UWGroups(object):
 
         desired_members = set(members)
 
-        try:
+        if self.group_exists(group_name):
             current_members = set(self.get_members(group_name))
-        except MissingResourceError:
-            # closing and reopening the connection seems to be
-            # necessary to prevent an httplib.ResponseNotReady error
-            # after an exception caused by a missing group.
-            self.reset()
+        else:
+            current_members = set()
             log.warning('creating group {}'.format(group_name))
-            self.create_group(group_name)
-            current_members = set(self.get_members(group_name))
+            if not dry_run:
+                self.create_group(group_name)
 
         log.info('current members: {}'.format(current_members))
         to_add, to_delete = reconcile(current_members, desired_members)
