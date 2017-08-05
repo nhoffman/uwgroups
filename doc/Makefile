@@ -20,7 +20,7 @@ help:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 publish:
-	ghp-import -p "$(BUILDDIR)"
+	ghp-import -p "$(BUILDDIR)/html"
 
 reset_docs:
 	git push origin :gh-pages
