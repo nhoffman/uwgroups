@@ -34,8 +34,9 @@ subprocess.call(
      '|| rm -f uwgroups/data/ver.tmp'),
     shell=True, stderr=open(os.devnull, "w"))
 
+
 from uwgroups import __version__
-package_data = glob.glob('data/*')
+package_data = ['data/*']
 
 params = {'author': 'Noah Hoffman',
           'author_email': 'ngh2@uw.edu',
