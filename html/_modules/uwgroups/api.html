@@ -1,0 +1,397 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>uwgroups.api &#8212; uwgroups 0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for uwgroups.api</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">httplib</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="k">import</span> <span class="n">path</span>
+<span class="kn">import</span> <span class="nn">xml.etree.ElementTree</span> <span class="k">as</span> <span class="nn">ET</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="kn">from</span> <span class="nn">jinja2</span> <span class="k">import</span> <span class="n">Environment</span><span class="p">,</span> <span class="n">PackageLoader</span>
+
+<span class="kn">from</span> <span class="nn">uwgroups</span> <span class="k">import</span> <span class="n">package_data</span>
+<span class="kn">from</span> <span class="nn">uwgroups.utils</span> <span class="k">import</span> <span class="n">reconcile</span><span class="p">,</span> <span class="n">prettify</span><span class="p">,</span> <span class="n">grouper</span><span class="p">,</span> <span class="n">check_types</span>
+
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">GWS_HOST</span> <span class="o">=</span> <span class="s1">&#39;iam-ws.u.washington.edu&#39;</span>
+<span class="n">GWS_PORT</span> <span class="o">=</span> <span class="mi">7443</span>
+<span class="n">API_PATH</span> <span class="o">=</span> <span class="s1">&#39;/group_sws/v2&#39;</span>
+
+<span class="c1"># https://certs.cac.washington.edu/?req=svpem</span>
+<span class="n">UWCA_ROOT</span> <span class="o">=</span> <span class="n">package_data</span><span class="p">(</span><span class="s1">&#39;root.cert&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="APIError"><a class="viewcode-back" href="../../modules.html#uwgroups.api.APIError">[docs]</a><span class="k">class</span> <span class="nc">APIError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="MissingResourceError"><a class="viewcode-back" href="../../modules.html#uwgroups.api.MissingResourceError">[docs]</a><span class="k">class</span> <span class="nc">MissingResourceError</span><span class="p">(</span><span class="n">APIError</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="AuthorizationError"><a class="viewcode-back" href="../../modules.html#uwgroups.api.AuthorizationError">[docs]</a><span class="k">class</span> <span class="nc">AuthorizationError</span><span class="p">(</span><span class="n">APIError</span><span class="p">):</span>
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="get_admins"><a class="viewcode-back" href="../../modules.html#uwgroups.api.get_admins">[docs]</a><span class="k">def</span> <span class="nf">get_admins</span><span class="p">(</span><span class="n">certfile</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns [dns_user, uwnetid_user] given data in cert</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+        <span class="p">[</span><span class="s1">&#39;openssl&#39;</span><span class="p">,</span> <span class="s1">&#39;x509&#39;</span><span class="p">,</span> <span class="s1">&#39;-in&#39;</span><span class="p">,</span> <span class="n">certfile</span><span class="p">,</span> <span class="s1">&#39;-noout&#39;</span><span class="p">,</span> <span class="s1">&#39;-subject&#39;</span><span class="p">])</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)]}</span>
+
+    <span class="n">dns_user</span> <span class="o">=</span> <span class="n">User</span><span class="p">(</span><span class="n">uwnetid</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;CN&#39;</span><span class="p">],</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;dns&#39;</span><span class="p">)</span>
+    <span class="n">uwnetid_user</span> <span class="o">=</span> <span class="n">User</span><span class="p">(</span><span class="n">uwnetid</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;emailAddress&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;uwnetid&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">dns_user</span><span class="p">,</span> <span class="n">uwnetid_user</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="User"><a class="viewcode-back" href="../../modules.html#uwgroups.api.User">[docs]</a><span class="k">class</span> <span class="nc">User</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="n">user_types</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;uwnetid&#39;</span><span class="p">,</span> <span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="s1">&#39;dns&#39;</span><span class="p">,</span> <span class="s1">&#39;eppn&#39;</span><span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uwnetid</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_types</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;user_type must be in </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">user_types</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">uwnetid</span> <span class="o">=</span> <span class="n">uwnetid</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="nb">type</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;User(uwnetid=</span><span class="si">{}</span><span class="s1">, type=</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">uwnetid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="UWGroups"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups">[docs]</a><span class="k">class</span> <span class="nc">UWGroups</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Class providing a connection to the UW groups REST</span>
+<span class="sd">    API. ``certfile`` and ``keyfile`` are paths to files containing</span>
+<span class="sd">    the certificate and private keys, respectively.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        with UWGroups(certfile=&#39;/path/to/cert.pem&#39;) as conn:</span>
+<span class="sd">            conn.get_group(&#39;some_group&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">certfile</span><span class="p">,</span> <span class="n">keyfile</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize the connection.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">certfile</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">certfile</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;certfile&#39; is required and must specify a readable file&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">keyfile</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">keyfile</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;keyfile&#39; must specify a readable file&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">keyfile</span> <span class="o">=</span> <span class="n">keyfile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">certfile</span> <span class="o">=</span> <span class="n">certfile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">j2env</span> <span class="o">=</span> <span class="n">Environment</span><span class="p">(</span><span class="n">loader</span><span class="o">=</span><span class="n">PackageLoader</span><span class="p">(</span><span class="s1">&#39;uwgroups&#39;</span><span class="p">,</span> <span class="s1">&#39;templates&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">admins</span> <span class="o">=</span> <span class="n">get_admins</span><span class="p">(</span><span class="n">certfile</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">admins</span><span class="p">)</span>
+
+<div class="viewcode-block" id="UWGroups.connect"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.connect">[docs]</a>    <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Establish a connection. If the ``UWGroups`` object is instantiated</span>
+<span class="sd">        without a with block, must be called explicitly.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">httplib</span><span class="o">.</span><span class="n">ssl</span><span class="o">.</span><span class="n">create_default_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="n">certfile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">certfile</span><span class="p">,</span> <span class="n">keyfile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">keyfile</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">load_verify_locations</span><span class="p">(</span><span class="n">UWCA_ROOT</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span> <span class="o">=</span> <span class="n">httplib</span><span class="o">.</span><span class="n">HTTPSConnection</span><span class="p">(</span>
+            <span class="n">GWS_HOST</span><span class="p">,</span> <span class="n">GWS_PORT</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;connected to </span><span class="si">{}</span><span class="s1">:</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">GWS_HOST</span><span class="p">,</span> <span class="n">GWS_PORT</span><span class="p">))</span></div>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tback</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<div class="viewcode-block" id="UWGroups.close"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Close the connection&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="UWGroups.reset"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Close and reopen the connection; may be necessary after am exception&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span></div>
+
+    <span class="nd">@check_types</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">endpoint</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span>
+                 <span class="n">body</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">expect_status</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">attempts</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">expect_status</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+                 <span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+        <span class="n">methods</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="s1">&#39;PUT&#39;</span><span class="p">,</span> <span class="s1">&#39;DELETE&#39;</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;method must be one of </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">methods</span><span class="p">)))</span>
+
+        <span class="n">url</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">API_PATH</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span>
+
+        <span class="n">args</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">headers</span><span class="p">:</span>
+            <span class="n">args</span><span class="p">[</span><span class="s1">&#39;headers&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">headers</span>
+        <span class="k">if</span> <span class="n">body</span><span class="p">:</span>
+            <span class="n">args</span><span class="p">[</span><span class="s1">&#39;body&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">body</span>
+
+        <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">attempts</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span>
+                <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">getresponse</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">httplib</span><span class="o">.</span><span class="n">BadStatusLine</span><span class="p">,</span> <span class="n">err</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;failure on attempt </span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">attempt</span><span class="p">,</span> <span class="n">err</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> </span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1"> </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">MissingResourceError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">401</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">AuthorizationError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="n">expect_status</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">APIError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">body</span>
+
+<div class="viewcode-block" id="UWGroups.get_group"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.get_group">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">get_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return an xml representation of a group&quot;&quot;&quot;</span>
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span>
+            <span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Accept&quot;</span><span class="p">:</span> <span class="s2">&quot;text/xml&quot;</span><span class="p">,</span> <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;text/xml&quot;</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">prettify</span><span class="p">(</span><span class="n">response</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="UWGroups.create_group"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.create_group">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">admin_users</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">create_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">admin_users</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a group with name ``group_name``. By default, the dns user</span>
+<span class="sd">        associated with the certificate, as well as the user</span>
+<span class="sd">        identified as the email contact for the cert in field</span>
+<span class="sd">        ``emailAddress`` are added as admins. A list of additional</span>
+<span class="sd">        admin users identified by uwnetid can be provided in</span>
+<span class="sd">        ``admin_users``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">)</span>
+
+        <span class="n">admins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">admins</span><span class="p">[:]</span>
+        <span class="k">if</span> <span class="n">admin_users</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">uwnetid</span> <span class="ow">in</span> <span class="n">admin_users</span><span class="p">:</span>
+                <span class="n">admins</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">User</span><span class="p">(</span><span class="n">uwnetid</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;uwnetid&#39;</span><span class="p">))</span>
+
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">j2env</span><span class="o">.</span><span class="n">get_template</span><span class="p">(</span><span class="s1">&#39;create_group.xml&#39;</span><span class="p">)</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">template</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">group_name</span><span class="p">,</span> <span class="n">admins</span><span class="o">=</span><span class="n">admins</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">prettify</span><span class="p">(</span><span class="n">body</span><span class="p">))</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span>
+            <span class="s1">&#39;PUT&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Accept&quot;</span><span class="p">:</span> <span class="s2">&quot;text/xml&quot;</span><span class="p">,</span> <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;text/xml&quot;</span><span class="p">},</span>
+            <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span>
+            <span class="n">expect_status</span><span class="o">=</span><span class="mi">201</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">prettify</span><span class="p">(</span><span class="n">response</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+
+<div class="viewcode-block" id="UWGroups.delete_group"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.delete_group">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">delete_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">):</span>
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s1">&#39;DELETE&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span></div>
+
+<div class="viewcode-block" id="UWGroups.get_members"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.get_members">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">get_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a list of uwnetids&quot;&quot;&quot;</span>
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="s1">&#39;member&#39;</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;accept&#39;</span><span class="p">:</span> <span class="s1">&#39;text/xml&#39;</span><span class="p">})</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">ET</span><span class="o">.</span><span class="n">fromstring</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+        <span class="n">members</span> <span class="o">=</span> <span class="p">[</span><span class="n">member</span><span class="o">.</span><span class="n">text</span> <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="s1">&#39;member&#39;</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">members</span></div>
+
+<div class="viewcode-block" id="UWGroups.add_members"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.add_members">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">members</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span> <span class="n">batchsize</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">add_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">members</span><span class="p">,</span> <span class="n">batchsize</span><span class="o">=</span><span class="mi">200</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add uwnetids in list ``members`` to the specified group in batches</span>
+<span class="sd">        of size ``batchsize``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">grouper</span><span class="p">(</span><span class="n">members</span><span class="p">,</span> <span class="n">batchsize</span><span class="p">):</span>
+            <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="s1">&#39;member&#39;</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">chunk</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s1">&#39;PUT&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="UWGroups.delete_members"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.delete_members">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">members</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span> <span class="n">batchsize</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">delete_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">members</span><span class="p">,</span> <span class="n">batchsize</span><span class="o">=</span><span class="mi">200</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Remove uwnetids in list ``members`` from the specified group in</span>
+<span class="sd">        batches of size ``batchsize``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">grouper</span><span class="p">(</span><span class="n">members</span><span class="p">,</span> <span class="n">batchsize</span><span class="p">):</span>
+            <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="s1">&#39;member&#39;</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">chunk</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s1">&#39;DELETE&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="UWGroups.group_exists"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.group_exists">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">group_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return True if the group exists&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="n">group_name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">MissingResourceError</span><span class="p">:</span>
+            <span class="c1"># closing and reopening the connection seems to be</span>
+            <span class="c1"># necessary to prevent an httplib.ResponseNotReady error</span>
+            <span class="c1"># after an exception caused by a missing group.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="UWGroups.sync_members"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.sync_members">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">members</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">sync_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">members</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add or remove users from the specified group as necessary so that</span>
+<span class="sd">        the group contains ``members`` (a list or uwnetids). When</span>
+<span class="sd">        ``dry_run`` is True, log the necessary actions but don&#39;t</span>
+<span class="sd">        modify the group. The group is created if it does not already</span>
+<span class="sd">        exist.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">desired_members</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">members</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">current_members</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_members</span><span class="p">(</span><span class="n">group_name</span><span class="p">))</span>
+        <span class="k">except</span> <span class="n">MissingResourceError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="n">current_members</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;creating group </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">group_name</span><span class="p">))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">dry_run</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="n">group_name</span><span class="p">)</span>
+
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> current members&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">current_members</span><span class="p">)))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;current members: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">current_members</span><span class="p">))</span>
+        <span class="n">to_add</span><span class="p">,</span> <span class="n">to_delete</span> <span class="o">=</span> <span class="n">reconcile</span><span class="p">(</span><span class="n">current_members</span><span class="p">,</span> <span class="n">desired_members</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">to_add</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;[+] </span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">group_name</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">to_add</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">dry_run</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">add_members</span><span class="p">(</span><span class="n">group_name</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">to_add</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">to_delete</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;[-] </span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">group_name</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">to_delete</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">dry_run</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">delete_members</span><span class="p">(</span><span class="n">group_name</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">to_delete</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="UWGroups.set_affiliate"><a class="viewcode-back" href="../../modules.html#uwgroups.api.UWGroups.set_affiliate">[docs]</a>    <span class="nd">@check_types</span><span class="p">(</span><span class="n">group_name</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">service</span><span class="o">=</span><span class="n">basestring</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">set_affiliate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="n">service</span><span class="p">,</span> <span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Activate (``active=True``) or inactivate (``active=False``)</span>
+<span class="sd">        Exchange (``service=exchange``) or Google Apps</span>
+<span class="sd">        (``service=google``) for the specified group.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">services</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;exchange&#39;</span><span class="p">:</span> <span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="s1">&#39;google&#39;</span><span class="p">:</span> <span class="s1">&#39;google&#39;</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">service</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">services</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;service must be one of </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">services</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+        <span class="n">endpoint</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;group&#39;</span><span class="p">,</span> <span class="n">group_name</span><span class="p">,</span> <span class="s1">&#39;affiliate&#39;</span><span class="p">,</span> <span class="n">services</span><span class="p">[</span><span class="n">service</span><span class="p">])</span>
+        <span class="n">endpoint</span> <span class="o">+=</span> <span class="s1">&#39;?status=&#39;</span> <span class="o">+</span> <span class="p">(</span><span class="s1">&#39;active&#39;</span> <span class="k">if</span> <span class="n">active</span> <span class="k">else</span> <span class="s1">&#39;inactive&#39;</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s1">&#39;PUT&#39;</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">uwgroups</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">API Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Noah Hoffman.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
