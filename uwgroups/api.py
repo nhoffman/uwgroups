@@ -63,9 +63,19 @@ class User(object):
 
 
 class UWGroups(object):
+    """Class providing a connection to the UW groups REST
+    API. ``certfile`` and ``keyfile`` are paths to files containing
+    the certificate and private keys, respectively.
+
+    Example::
+
+        with UWGroups(certfile='/path/to/cert.pem') as conn:
+            conn.get_group('some_group')
+
+    """
+
     def __init__(self, certfile, keyfile=None):
-        """Initialize the connection. key and cert are paths to the key and
-        certificate files, respectively.
+        """Initialize the connection.
 
         """
 
@@ -82,6 +92,10 @@ class UWGroups(object):
         log.info(self.admins)
 
     def connect(self):
+        """Establish a connection. If the ``UWGroups`` object is instantiated
+        without a with block, must be called explicitly.
+
+        """
         self.context = httplib.ssl.create_default_context()
         self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
@@ -97,16 +111,18 @@ class UWGroups(object):
         self.close()
 
     def close(self):
+        """Close the connection"""
         self.connection.close()
 
     def reset(self):
+        """Close and reopen the connection; may be necessary after am exception"""
         self.close()
         self.connect()
 
     @check_types(method=basestring, endpoint=basestring, headers=dict,
                  body=basestring, expect_status=int, attempts=int)
-    def request(self, method, endpoint, headers=None, body=None, expect_status=200,
-                attempts=3):
+    def _request(self, method, endpoint, headers=None, body=None, expect_status=200,
+                 attempts=3):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
             raise ValueError('method must be one of {}'.format(', '.join(methods)))
@@ -121,7 +137,7 @@ class UWGroups(object):
 
         for attempt in range(attempts):
             try:
-                self.connection.request(method, url, **args)
+                self.connection._request(method, url, **args)
                 response = self.connection.getresponse()
             except httplib.BadStatusLine, err:
                 log.warning('failure on attempt {}: {}'.format(attempt, err))
@@ -144,27 +160,35 @@ class UWGroups(object):
 
     @check_types(group_name=basestring)
     def get_group(self, group_name):
+        """Return an xml representation of a group"""
         endpoint = path.join('group', group_name)
-        response = self.request(
+        response = self._request(
             'GET', endpoint,
             headers={"Accept": "text/xml", "Content-Type": "text/xml"})
         return prettify(response)
 
-    @check_types(group_name=basestring, admins=list)
-    def create_group(self, group_name, admins=None):
+    @check_types(group_name=basestring, admin_users=list)
+    def create_group(self, group_name, admin_users=None):
+        """Create a group with name ``group_name``. By default, the dns user
+        associated with the certificate, as well as the user
+        identified as the email contact for the cert in field
+        ``emailAddress`` are added as admins. A list of additional
+        admin users identified by uwnetid can be provided in
+        ``admin_users``.
+
+        """
         endpoint = path.join('group', group_name)
-        extra_admins = admins or []
-        for admin in extra_admins:
-            if not isinstance(admin, User):
-                raise TypeError('admins must be User instances')
+
+        admins = self.admins[:]
+        if admin_users:
+            for uwnetid in admin_users:
+                admins.append(User(uwnetid, type='uwnetid'))
 
         template = self.j2env.get_template('create_group.xml')
-        body = template.render(
-            group_name=group_name,
-            admins=self.admins + extra_admins)
+        body = template.render(group_name=group_name, admins=admins)
         log.debug(prettify(body))
 
-        response = self.request(
+        response = self._request(
             'PUT', endpoint,
             headers={"Accept": "text/xml", "Content-Type": "text/xml"},
             body=body,
@@ -175,31 +199,41 @@ class UWGroups(object):
     @check_types(group_name=basestring)
     def delete_group(self, group_name):
         endpoint = path.join('group', group_name)
-        response = self.request('DELETE', endpoint)
+        response = self._request('DELETE', endpoint)
         return response
 
     @check_types(group_name=basestring)
     def get_members(self, group_name):
+        """Return a list of uwnetids"""
         endpoint = path.join('group', group_name, 'member')
-        response = self.request('GET', endpoint, headers={'accept': 'text/xml'})
+        response = self._request('GET', endpoint, headers={'accept': 'text/xml'})
         root = ET.fromstring(response)
         members = [member.text for member in root.iter('member')]
         return members
 
     @check_types(group_name=basestring, members=list, batchsize=int)
     def add_members(self, group_name, members, batchsize=200):
+        """Add uwnetids in list ``members`` to the specified group in batches
+        of size ``batchsize``.
+
+        """
         for chunk in grouper(members, batchsize):
             endpoint = path.join('group', group_name, 'member', ','.join(chunk))
-            self.request('PUT', endpoint)
+            self._request('PUT', endpoint)
 
     @check_types(group_name=basestring, members=list, batchsize=int)
     def delete_members(self, group_name, members, batchsize=200):
+        """Remove uwnetids in list ``members`` from the specified group in
+        batches of size ``batchsize``.
+
+        """
         for chunk in grouper(members, batchsize):
             endpoint = path.join('group', group_name, 'member', ','.join(chunk))
-            self.request('DELETE', endpoint)
+            self._request('DELETE', endpoint)
 
     @check_types(group_name=basestring)
     def group_exists(self, group_name):
+        """Return True if the group exists"""
         try:
             self.get_group(group_name)
         except MissingResourceError:
@@ -213,8 +247,11 @@ class UWGroups(object):
 
     @check_types(group_name=basestring, members=list)
     def sync_members(self, group_name, members, dry_run=False):
-        """Define members for group_name, adding and removing users as
-        necessary.
+        """Add or remove users from the specified group as necessary so that
+        the group contains ``members`` (a list or uwnetids). When
+        ``dry_run`` is True, log the necessary actions but don't
+        modify the group. The group is created if it does not already
+        exist.
 
         """
 
@@ -243,11 +280,18 @@ class UWGroups(object):
             if not dry_run:
                 self.delete_members(group_name, sorted(to_delete))
 
+    @check_types(group_name=basestring, service=basestring, active=bool)
     def set_affiliate(self, group_name, service, active=True):
+        """Activate (``active=True``) or inactivate (``active=False``)
+        Exchange (``service=exchange``) or Google Apps
+        (``service=google``) for the specified group.
+
+        """
+
         services = {'exchange': 'email', 'google': 'google'}
         if service not in services:
             raise ValueError('service must be one of {}'.format(services.keys()))
         endpoint = path.join('group', group_name, 'affiliate', services[service])
         endpoint += '?status=' + ('active' if active else 'inactive')
-        response = self.request('PUT', endpoint)
+        response = self._request('PUT', endpoint)
         return response

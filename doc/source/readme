@@ -1,12 +1,5 @@
-========================================
-Python library and CLI for UW Groups API
-========================================
 
-.. contents:: Table of Contents
-
-* API Documentation: https://nhoffman.github.io/uwgroups/
-
-Implements an arbitrary subset of the UW Groups REST API
+Implements a subset of the UW Groups REST API
 (https://wiki.cac.washington.edu/display/infra/Groups+Web+Service+REST+API)
 that I find useful. Under development.
 
