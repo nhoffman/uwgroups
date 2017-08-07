@@ -137,7 +137,7 @@ class UWGroups(object):
 
         for attempt in range(attempts):
             try:
-                self.connection._request(method, url, **args)
+                self.connection.request(method, url, **args)
                 response = self.connection.getresponse()
             except httplib.BadStatusLine, err:
                 log.warning('failure on attempt {}: {}'.format(attempt, err))
