@@ -36,11 +36,12 @@ subprocess.call(
 
 
 from uwgroups import __version__
-package_data = ['data/*']
+package_data = ['data/*', 'templates/*.xml']
 
 params = {'author': 'Noah Hoffman',
           'author_email': 'ngh2@uw.edu',
           'description': 'UW Groups API',
+          'url': 'https://github.com/nhoffman/uwgroups',
           'name': 'uwgroups',
           'packages': find_packages(),
           'package_dir': {'uwgroups': 'uwgroups'},
@@ -53,7 +54,14 @@ params = {'author': 'Noah Hoffman',
           ],
           'package_data': {'uwgroups': package_data},
           'test_suite': 'tests',
-          'cmdclass': {'version': CheckVersion}
-          }
+          'cmdclass': {'version': CheckVersion},
+          'classifiers': [
+              'Development Status :: 3 - Alpha',
+              'License :: OSI Approved :: MIT License',
+              'Programming Language :: Python :: 2.7',
+              'Topic :: Text Processing :: Linguistic',
+              'Intended Audience :: Developers',
+              'Topic :: System :: Systems Administration :: Authentication/Directory',
+          ]}
 
 setup(**params)
