@@ -65,7 +65,8 @@ class User(object):
 class UWGroups(object):
     """Class providing a connection to the UW groups REST
     API. ``certfile`` and ``keyfile`` are paths to files containing
-    the certificate and private keys, respectively.
+    the certificate and private keys, respectively. ``timeout`` is
+    passed to ``httplib.HTTPSConnection()``
 
     Example::
 
@@ -74,7 +75,7 @@ class UWGroups(object):
 
     """
 
-    def __init__(self, certfile, keyfile=None):
+    def __init__(self, certfile, keyfile=None, timeout=30):
         """Initialize the connection.
 
         """
@@ -90,17 +91,22 @@ class UWGroups(object):
         self.j2env = Environment(loader=PackageLoader('uwgroups', 'templates'))
         self.admins = get_admins(certfile)
         log.info(self.admins)
+        self.timeout = timeout
 
-    def connect(self):
+    def connect(self, timeout=None):
         """Establish a connection. If the ``UWGroups`` object is instantiated
-        without a with block, must be called explicitly.
+        without a with block, must be called explicitly. ``timeout``
+        overrides the value for ``timeout`` in the class constructor.
 
         """
         self.context = httplib.ssl.create_default_context()
         self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
         self.connection = httplib.HTTPSConnection(
-            GWS_HOST, GWS_PORT, context=self.context)
+            host=GWS_HOST,
+            timeout=timeout or self.timeout,
+            port=GWS_PORT,
+            context=self.context)
         log.info('connected to {}:{}'.format(GWS_HOST, GWS_PORT))
 
     def __enter__(self):
