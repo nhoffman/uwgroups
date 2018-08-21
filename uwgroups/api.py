@@ -1,7 +1,9 @@
 from __future__ import print_function
+import errno
 import logging
 import httplib
 from os import path
+import socket
 import xml.etree.ElementTree as ET
 import subprocess
 
@@ -148,6 +150,9 @@ class UWGroups(object):
             except httplib.BadStatusLine, err:
                 log.warning('failure on attempt {}: {}'.format(attempt, err))
                 self.reset()
+            except socket.error, err:
+                if err.errno != errno.ETIMEDOUT:
+                    break
             else:
                 break
 
