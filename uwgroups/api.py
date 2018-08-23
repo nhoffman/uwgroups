@@ -123,7 +123,7 @@ class UWGroups(object):
         self.connection.close()
 
     def reset(self):
-        """Close and reopen the connection; may be necessary after am exception"""
+        """Close and reopen the connection; may be necessary after an exception"""
         self.close()
         self.connect()
 
