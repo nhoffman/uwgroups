@@ -130,7 +130,7 @@ class UWGroups(object):
     @check_types(method=basestring, endpoint=basestring, headers=dict,
                  body=basestring, expect_status=int, attempts=int)
     def _request(self, method, endpoint, headers=None, body=None, expect_status=200,
-                 attempts=3):
+                 attempts=5):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
             raise ValueError('method must be one of {}'.format(', '.join(methods)))
@@ -148,13 +148,23 @@ class UWGroups(object):
                 self.connection.request(method, url, **args)
                 response = self.connection.getresponse()
             except httplib.BadStatusLine, err:
+                caught_err = err
                 log.warning('failure on attempt {}: {}'.format(attempt, err))
                 self.reset()
             except socket.error, err:
+                caught_err = err
                 if err.errno != errno.ETIMEDOUT:
-                    break
+                    log.warning('failure on attempt {}: {}'.format(attempt, err))
+                    # response isn't set at all for this case, reraise the exception.
+                    raise
+                self.reset()
             else:
                 break
+        else:
+            # Hit the limit of attempts. The response variable never got set.
+            msg = '{}: {} {}'.format(caught_err, method, url)
+            log.info(msg)
+            raise APIError(msg)
 
         msg = '{} {}: {} {}'.format(method, url, response.status, response.reason)
         log.info(msg)
