@@ -4,20 +4,12 @@
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>API Documentation &#8212; uwgroups 0.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    './',
-        VERSION:     '0.1',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true,
-        SOURCELINK_SUFFIX: '.txt'
-      };
-    </script>
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
@@ -30,13 +22,14 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
 
-  </head>
-  <body>
+  </head><body>
   
 
     <div class="document">
       <div class="documentwrapper">
         <div class="bodywrapper">
+          
+
           <div class="body" role="main">
             
   <div class="section" id="module-uwgroups.api">
@@ -58,20 +51,21 @@
 
 <dl class="class">
 <dt id="uwgroups.api.UWGroups">
-<em class="property">class </em><code class="descclassname">uwgroups.api.</code><code class="descname">UWGroups</code><span class="sig-paren">(</span><em>certfile</em>, <em>keyfile=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">uwgroups.api.</code><code class="descname">UWGroups</code><span class="sig-paren">(</span><em>certfile</em>, <em>keyfile=None</em>, <em>timeout=30</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups" title="Permalink to this definition">¶</a></dt>
 <dd><p>Class providing a connection to the UW groups REST
-API. <code class="docutils literal"><span class="pre">certfile</span></code> and <code class="docutils literal"><span class="pre">keyfile</span></code> are paths to files containing
-the certificate and private keys, respectively.</p>
+API. <code class="docutils literal notranslate"><span class="pre">certfile</span></code> and <code class="docutils literal notranslate"><span class="pre">keyfile</span></code> are paths to files containing
+the certificate and private keys, respectively. <code class="docutils literal notranslate"><span class="pre">timeout</span></code> is
+passed to <code class="docutils literal notranslate"><span class="pre">httplib.HTTPSConnection()</span></code></p>
 <p>Example:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">UWGroups</span><span class="p">(</span><span class="n">certfile</span><span class="o">=</span><span class="s1">&#39;/path/to/cert.pem&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">UWGroups</span><span class="p">(</span><span class="n">certfile</span><span class="o">=</span><span class="s1">&#39;/path/to/cert.pem&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
     <span class="n">conn</span><span class="o">.</span><span class="n">get_group</span><span class="p">(</span><span class="s1">&#39;some_group&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.add_members">
 <code class="descname">add_members</code><span class="sig-paren">(</span><em>group_name</em>, <em>members</em>, <em>batchsize=200</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.add_members"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.add_members" title="Permalink to this definition">¶</a></dt>
-<dd><p>Add uwnetids in list <code class="docutils literal"><span class="pre">members</span></code> to the specified group in batches
-of size <code class="docutils literal"><span class="pre">batchsize</span></code>.</p>
+<dd><p>Add uwnetids in list <code class="docutils literal notranslate"><span class="pre">members</span></code> to the specified group in batches
+of size <code class="docutils literal notranslate"><span class="pre">batchsize</span></code>.</p>
 </dd></dl>
 
 <dl class="method">
@@ -82,20 +76,21 @@ of size <code class="docutils literal"><span class="pre">batchsize</span></code>
 
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.connect">
-<code class="descname">connect</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.connect"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.connect" title="Permalink to this definition">¶</a></dt>
-<dd><p>Establish a connection. If the <code class="docutils literal"><span class="pre">UWGroups</span></code> object is instantiated
-without a with block, must be called explicitly.</p>
+<code class="descname">connect</code><span class="sig-paren">(</span><em>timeout=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.connect"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.connect" title="Permalink to this definition">¶</a></dt>
+<dd><p>Establish a connection. If the <code class="docutils literal notranslate"><span class="pre">UWGroups</span></code> object is instantiated
+without a with block, must be called explicitly. <code class="docutils literal notranslate"><span class="pre">timeout</span></code>
+overrides the value for <code class="docutils literal notranslate"><span class="pre">timeout</span></code> in the class constructor.</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.create_group">
 <code class="descname">create_group</code><span class="sig-paren">(</span><em>group_name</em>, <em>admin_users=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.create_group"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.create_group" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create a group with name <code class="docutils literal"><span class="pre">group_name</span></code>. By default, the dns user
+<dd><p>Create a group with name <code class="docutils literal notranslate"><span class="pre">group_name</span></code>. By default, the dns user
 associated with the certificate, as well as the user
 identified as the email contact for the cert in field
-<code class="docutils literal"><span class="pre">emailAddress</span></code> are added as admins. A list of additional
+<code class="docutils literal notranslate"><span class="pre">emailAddress</span></code> are added as admins. A list of additional
 admin users identified by uwnetid can be provided in
-<code class="docutils literal"><span class="pre">admin_users</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">admin_users</span></code>.</p>
 </dd></dl>
 
 <dl class="method">
@@ -106,8 +101,8 @@ admin users identified by uwnetid can be provided in
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.delete_members">
 <code class="descname">delete_members</code><span class="sig-paren">(</span><em>group_name</em>, <em>members</em>, <em>batchsize=200</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.delete_members"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.delete_members" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove uwnetids in list <code class="docutils literal"><span class="pre">members</span></code> from the specified group in
-batches of size <code class="docutils literal"><span class="pre">batchsize</span></code>.</p>
+<dd><p>Remove uwnetids in list <code class="docutils literal notranslate"><span class="pre">members</span></code> from the specified group in
+batches of size <code class="docutils literal notranslate"><span class="pre">batchsize</span></code>.</p>
 </dd></dl>
 
 <dl class="method">
@@ -131,23 +126,23 @@ batches of size <code class="docutils literal"><span class="pre">batchsize</span
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.reset">
 <code class="descname">reset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.reset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.reset" title="Permalink to this definition">¶</a></dt>
-<dd><p>Close and reopen the connection; may be necessary after am exception</p>
+<dd><p>Close and reopen the connection; may be necessary after an exception</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.set_affiliate">
 <code class="descname">set_affiliate</code><span class="sig-paren">(</span><em>group_name</em>, <em>service</em>, <em>active=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.set_affiliate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.set_affiliate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Activate (<code class="docutils literal"><span class="pre">active=True</span></code>) or inactivate (<code class="docutils literal"><span class="pre">active=False</span></code>)
-Exchange (<code class="docutils literal"><span class="pre">service=exchange</span></code>) or Google Apps
-(<code class="docutils literal"><span class="pre">service=google</span></code>) for the specified group.</p>
+<dd><p>Activate (<code class="docutils literal notranslate"><span class="pre">active=True</span></code>) or inactivate (<code class="docutils literal notranslate"><span class="pre">active=False</span></code>)
+Exchange (<code class="docutils literal notranslate"><span class="pre">service=exchange</span></code>) or Google Apps
+(<code class="docutils literal notranslate"><span class="pre">service=google</span></code>) for the specified group.</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="uwgroups.api.UWGroups.sync_members">
 <code class="descname">sync_members</code><span class="sig-paren">(</span><em>group_name</em>, <em>members</em>, <em>dry_run=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/uwgroups/api.html#UWGroups.sync_members"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#uwgroups.api.UWGroups.sync_members" title="Permalink to this definition">¶</a></dt>
 <dd><p>Add or remove users from the specified group as necessary so that
-the group contains <code class="docutils literal"><span class="pre">members</span></code> (a list or uwnetids). When
-<code class="docutils literal"><span class="pre">dry_run</span></code> is True, log the necessary actions but don’t
+the group contains <code class="docutils literal notranslate"><span class="pre">members</span></code> (a list or uwnetids). When
+<code class="docutils literal notranslate"><span class="pre">dry_run</span></code> is True, log the necessary actions but don’t
 modify the group. The group is created if it does not already
 exist.</p>
 </dd></dl>
@@ -174,6 +169,7 @@ exist.</p>
 
 
           </div>
+          
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
@@ -203,12 +199,14 @@ exist.</p>
 </div>
 <div id="searchbox" style="display: none" role="search">
   <h3>Quick search</h3>
+    <div class="searchformwrapper">
     <form class="search" action="search.html" method="get">
-      <div><input type="text" name="q" /></div>
-      <div><input type="submit" value="Go" /></div>
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
       <input type="hidden" name="check_keywords" value="yes" />
       <input type="hidden" name="area" value="default" />
     </form>
+    </div>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
         </div>
@@ -219,8 +217,8 @@ exist.</p>
       &copy;2017, Noah Hoffman.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.3</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.11</a>
       
       |
       <a href="_sources/modules.rst.txt"
