@@ -2,6 +2,12 @@
  changes for uwgroups
 ======================
 
+0.2.4
+=====
+
+* Better handling of timeout errors.
+
+
 0.2.3
 =====
 
