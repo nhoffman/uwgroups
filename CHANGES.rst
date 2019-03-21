@@ -2,6 +2,11 @@
  changes for uwgroups
 ======================
 
+0.2.5
+=====
+
+* Use port 443 instead of 7443
+
 0.2.4
 =====
 

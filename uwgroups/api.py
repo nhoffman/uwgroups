@@ -15,7 +15,7 @@ from uwgroups.utils import reconcile, prettify, grouper, check_types
 log = logging.getLogger(__name__)
 
 GWS_HOST = 'iam-ws.u.washington.edu'
-GWS_PORT = 7443
+GWS_PORT = 443
 API_PATH = '/group_sws/v2'
 
 # https://certs.cac.washington.edu/?req=svpem

@@ -19,9 +19,21 @@ dependencies
 installation
 ============
 
+Set up a virtualenv::
+
+  virtualenv py2-env
+  source py2-env/bin/activate
+  pip install -U pip
+
 For now, install directly from GitHub::
 
   pip install git+https://github.com/nhoffman/uwgroups.git
+
+Alternatively, for development, from the top level of the repo (after
+installing and activating the virtualenv)::
+
+  pip install -e .
+  pip install -r requirements.txt
 
 CLI
 ===
@@ -95,7 +107,7 @@ class, or method within the ``tests`` package using dot notation::
 license
 =======
 
-Copyright (c) 2017 Noah Hoffman
+Copyright (c) 2017-2019 Noah Hoffman
 
 Released under the MIT License:
 
