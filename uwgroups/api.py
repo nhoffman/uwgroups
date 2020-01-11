@@ -39,10 +39,12 @@ def get_admins(certfile):
 
     """
 
-    output = subprocess.check_output(
-        ['openssl', 'x509', '-in', certfile, '-noout', '-subject'])
+    output = subprocess.run(
+        ['openssl', 'x509', '-in', certfile, '-noout', '-subject'],
+        capture_output=True, text=True)
     log.debug(output)
-    data = {k: v.strip() or None for k, v in [e.split('=') for e in output.split('/')]}
+    data = {k: v.strip() or None
+            for k, v in [e.split('=') for e in output.stdout.split('/')]}
 
     dns_user = User(uwnetid=data['CN'], type='dns')
     uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
