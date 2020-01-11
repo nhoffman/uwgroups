@@ -1,4 +1,4 @@
-"""Get xml representation of a group
+"""List group members
 """
 
 import logging
@@ -19,7 +19,8 @@ def action(args):
     certfile, keyfile = find_credentials(args)
     with UWGroups(certfile, keyfile) as conn:
         if conn.group_exists(args.group_name):
-            body = conn.get_group(args.group_name)
-            pprint.pprint(body)
+            members = conn.get_members(args.group_name)
+            for m in sorted(members):
+                print(m)
         else:
             sys.exit(f'group "{args.group_name}" does not exist')

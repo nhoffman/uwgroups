@@ -18,7 +18,9 @@ def parse_arguments(argv):
     Create the argument parser
     """
 
-    parser = argparse.ArgumentParser(description=docstring)
+    parser = argparse.ArgumentParser(
+        description=docstring,
+        formatter_class=RawDescriptionHelpFormatter)
 
     parser.add_argument('-V', '--version', action='version',
                         version=version,

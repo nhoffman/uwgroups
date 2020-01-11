@@ -18,5 +18,5 @@ def action(args):
     certfile, keyfile = find_credentials(args)
     with UWGroups(certfile, keyfile) as conn:
         conn.create_group(args.group_name)
-        conn.set_affiliate(args.group_name, service='exchange',
-                       active=args.exchange == 'yes')
+        conn.set_affiliate(
+            args.group_name, service='exchange', active=args.exchange == 'yes')

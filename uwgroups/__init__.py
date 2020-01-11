@@ -1,5 +1,11 @@
 """
 CLI for the UW Groups API
+
+Use the environment variable GWS_HOST to define the API host:
+
+PROD: groups.uw.edu (default)
+DEV: dev.groups.uw.edu
+EVAL: eval.groups.uw.edu
 """
 
 import glob
