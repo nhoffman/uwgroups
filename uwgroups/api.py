@@ -244,9 +244,6 @@ class UWGroups(object):
             }
         }
 
-        with open(f'create-{group_name}.json', 'w') as f:
-            json.dump(body, f, indent=2)
-
         response = self._request(
             'PUT', endpoint,
             headers={"Accept": "application/json", "Content-Type": "application/json"},
