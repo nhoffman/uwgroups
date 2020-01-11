@@ -5,7 +5,7 @@ Test subcommands.
 import logging
 
 from uwgroups.scripts.main import main
-from __init__ import TestCaseSuppressOutput, TestBase
+from .__init__ import TestCaseSuppressOutput, TestBase
 
 log = logging.getLogger(__name__)
 

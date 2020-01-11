@@ -1,7 +1,7 @@
-from __future__ import print_function
+
 import errno
 import logging
-import httplib
+import http.client
 from os import path
 import socket
 import xml.etree.ElementTree as ET
@@ -101,10 +101,10 @@ class UWGroups(object):
         overrides the value for ``timeout`` in the class constructor.
 
         """
-        self.context = httplib.ssl.create_default_context()
+        self.context = http.client.ssl.create_default_context()
         self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
-        self.connection = httplib.HTTPSConnection(
+        self.connection = http.client.HTTPSConnection(
             host=GWS_HOST,
             timeout=timeout or self.timeout,
             port=GWS_PORT,
@@ -127,8 +127,8 @@ class UWGroups(object):
         self.close()
         self.connect()
 
-    @check_types(method=basestring, endpoint=basestring, headers=dict,
-                 body=basestring, expect_status=int, attempts=int)
+    @check_types(method=str, endpoint=str, headers=dict,
+                 body=str, expect_status=int, attempts=int)
     def _request(self, method, endpoint, headers=None, body=None, expect_status=200,
                  attempts=5):
         methods = {'GET', 'PUT', 'DELETE'}
@@ -147,11 +147,11 @@ class UWGroups(object):
             try:
                 self.connection.request(method, url, **args)
                 response = self.connection.getresponse()
-            except httplib.BadStatusLine, err:
+            except http.client.BadStatusLine as err:
                 caught_err = err
                 log.warning('failure on attempt {}: {}'.format(attempt, err))
                 self.reset()
-            except socket.error, err:
+            except socket.error as err:
                 caught_err = err
                 if err.errno != errno.ETIMEDOUT:
                     log.warning('failure on attempt {}: {}'.format(attempt, err))
@@ -179,7 +179,7 @@ class UWGroups(object):
         body = response.read()
         return body
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
     def get_group(self, group_name):
         """Return an xml representation of a group"""
         endpoint = path.join('group', group_name)
@@ -188,7 +188,7 @@ class UWGroups(object):
             headers={"Accept": "text/xml", "Content-Type": "text/xml"})
         return prettify(response)
 
-    @check_types(group_name=basestring, admin_users=list)
+    @check_types(group_name=str, admin_users=list)
     def create_group(self, group_name, admin_users=None):
         """Create a group with name ``group_name``. By default, the dns user
         associated with the certificate, as well as the user
@@ -217,13 +217,13 @@ class UWGroups(object):
         log.debug(prettify(response))
         return response
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
     def delete_group(self, group_name):
         endpoint = path.join('group', group_name)
         response = self._request('DELETE', endpoint)
         return response
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
     def get_members(self, group_name):
         """Return a list of uwnetids"""
         endpoint = path.join('group', group_name, 'member')
@@ -232,7 +232,7 @@ class UWGroups(object):
         members = [member.text for member in root.iter('member')]
         return members
 
-    @check_types(group_name=basestring, members=list, batchsize=int)
+    @check_types(group_name=str, members=list, batchsize=int)
     def add_members(self, group_name, members, batchsize=200):
         """Add uwnetids in list ``members`` to the specified group in batches
         of size ``batchsize``.
@@ -242,7 +242,7 @@ class UWGroups(object):
             endpoint = path.join('group', group_name, 'member', ','.join(chunk))
             self._request('PUT', endpoint)
 
-    @check_types(group_name=basestring, members=list, batchsize=int)
+    @check_types(group_name=str, members=list, batchsize=int)
     def delete_members(self, group_name, members, batchsize=200):
         """Remove uwnetids in list ``members`` from the specified group in
         batches of size ``batchsize``.
@@ -252,7 +252,7 @@ class UWGroups(object):
             endpoint = path.join('group', group_name, 'member', ','.join(chunk))
             self._request('DELETE', endpoint)
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
     def group_exists(self, group_name):
         """Return True if the group exists"""
         try:
@@ -266,7 +266,7 @@ class UWGroups(object):
         else:
             return True
 
-    @check_types(group_name=basestring, members=list)
+    @check_types(group_name=str, members=list)
     def sync_members(self, group_name, members, dry_run=False):
         """Add or remove users from the specified group as necessary so that
         the group contains ``members`` (a list or uwnetids). When
@@ -301,7 +301,7 @@ class UWGroups(object):
             if not dry_run:
                 self.delete_members(group_name, sorted(to_delete))
 
-    @check_types(group_name=basestring, service=basestring, active=bool)
+    @check_types(group_name=str, service=str, active=bool)
     def set_affiliate(self, group_name, service, active=True):
         """Activate (``active=True``) or inactivate (``active=False``)
         Exchange (``service=exchange``) or Google Apps
@@ -311,7 +311,7 @@ class UWGroups(object):
 
         services = {'exchange': 'email', 'google': 'google'}
         if service not in services:
-            raise ValueError('service must be one of {}'.format(services.keys()))
+            raise ValueError('service must be one of {}'.format(list(services.keys())))
         endpoint = path.join('group', group_name, 'affiliate', services[service])
         endpoint += '?status=' + ('active' if active else 'inactive')
         response = self._request('PUT', endpoint)

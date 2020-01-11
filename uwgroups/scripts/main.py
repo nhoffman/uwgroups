@@ -60,7 +60,7 @@ def parse_arguments(argv):
     # Organize submodules by argv
     modules = [name for _, name, _ in pkgutil.iter_modules(subcommands.__path__)]
     modules = [m for m in modules if not m.startswith('_')]
-    run = filter(lambda name: name in argv, modules)
+    run = [name for name in modules if name in argv]
 
     actions = {}
 
