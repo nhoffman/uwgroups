@@ -1,4 +1,3 @@
-import glob
 import os
 import subprocess
 
@@ -36,7 +35,7 @@ subprocess.call(
 
 
 from uwgroups import __version__
-package_data = ['data/*', 'templates/*.xml']
+package_data = ['data/*']
 
 params = {'author': 'Noah Hoffman',
           'author_email': 'ngh2@uw.edu',
@@ -49,16 +48,16 @@ params = {'author': 'Noah Hoffman',
               'console_scripts': ['uwgroups = uwgroups.scripts.main:main']
           },
           'version': __version__,
-          'install_requires': [
-              'Jinja2>=2.8',
-          ],
+          'install_requires': [],
           'package_data': {'uwgroups': package_data},
           'test_suite': 'tests',
           'cmdclass': {'version': CheckVersion},
           'classifiers': [
-              'Development Status :: 3 - Alpha',
+              'Development Status :: 4 - Beta',
               'License :: OSI Approved :: MIT License',
-              'Programming Language :: Python :: 2.7',
+              'Programming Language :: Python :: 3.6',
+              'Programming Language :: Python :: 3.7',
+              'Programming Language :: Python :: 3.8',
               'Topic :: Text Processing :: Linguistic',
               'Intended Audience :: Developers',
               'Topic :: System :: Systems Administration :: Authentication/Directory',

@@ -6,14 +6,14 @@ Python library and CLI for UW Groups API
 
 * API Documentation: https://nhoffman.github.io/uwgroups/
 
-Implements an arbitrary subset of the UW Groups REST API
+Implements a limited subset of the UW Groups REST API v3
 (https://wiki.cac.washington.edu/display/infra/Groups+Web+Service+REST+API)
-that I find useful. Under development.
+that I find useful in a specific application.
 
 dependencies
 ============
 
-* Python 2.7.x
+* Python 3.6+
 * Tested on Linux and OS X.
 
 installation
@@ -21,8 +21,8 @@ installation
 
 Set up a virtualenv::
 
-  virtualenv py2-env
-  source py2-env/bin/activate
+  python3 -m venv py3-env
+  source py3-env/bin/activate
   pip install -U pip
 
 For now, install directly from GitHub::
@@ -90,6 +90,15 @@ or using the environment variable ``UWGROUPS_CERT``::
 The key may also be provided in a separate fie using ``-k/--key-file``
 or ``UWGROUPS_KEY`` as above.
 
+API hosts
+=========
+
+Use the environment variable ``GWS_HOST`` to define the API host:
+
+* ``PROD``: groups.uw.edu (default)
+* ``DEV``: dev.groups.uw.edu
+* ``EVAL``: eval.groups.uw.edu
+
 unit tests
 ==========
 
@@ -107,7 +116,7 @@ class, or method within the ``tests`` package using dot notation::
 license
 =======
 
-Copyright (c) 2017-2019 Noah Hoffman
+Copyright (c) 2017-2020 Noah Hoffman
 
 Released under the MIT License:
 

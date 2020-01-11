@@ -1,4 +1,4 @@
-"""Get xml representation of a group
+"""Show the API response for information about a group
 """
 
 import logging

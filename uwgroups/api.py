@@ -7,8 +7,6 @@ import socket
 import subprocess
 import json
 
-from jinja2 import Environment, PackageLoader
-
 from uwgroups import package_data
 from uwgroups.utils import reconcile, grouper, check_types
 
@@ -101,7 +99,6 @@ class UWGroups(object):
 
         self.keyfile = keyfile
         self.certfile = certfile
-        self.j2env = Environment(loader=PackageLoader('uwgroups', 'templates'))
         self.admins = get_admins(certfile)
         log.info(self.admins)
         self.timeout = timeout
