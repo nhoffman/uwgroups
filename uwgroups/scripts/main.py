@@ -18,7 +18,9 @@ def parse_arguments(argv):
     Create the argument parser
     """
 
-    parser = argparse.ArgumentParser(description=docstring)
+    parser = argparse.ArgumentParser(
+        description=docstring,
+        formatter_class=RawDescriptionHelpFormatter)
 
     parser.add_argument('-V', '--version', action='version',
                         version=version,
@@ -39,11 +41,11 @@ def parse_arguments(argv):
                         certificate. The file path can also be
                         specified using the environment variable
                         {}. May contain the private key as well, in
-                        which case -k/--keyfile is optional.""".format(key_var_name))
+                        which case -k/--keyfile is optional.""".format(cert_var_name))
     parser.add_argument('-k', '--key-file',
                         help="""Path to the RSA private key file. May
                         also be specified using the environment variable
-                        {}""".format(cert_var_name))
+                        {}""".format(key_var_name))
 
     ##########################
     # Setup all sub-commands #
@@ -60,7 +62,7 @@ def parse_arguments(argv):
     # Organize submodules by argv
     modules = [name for _, name, _ in pkgutil.iter_modules(subcommands.__path__)]
     modules = [m for m in modules if not m.startswith('_')]
-    run = filter(lambda name: name in argv, modules)
+    run = [name for name in modules if name in argv]
 
     actions = {}
 

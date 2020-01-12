@@ -1,8 +1,7 @@
 import os
 import logging
 import shutil
-import xml.dom.minidom
-from itertools import izip_longest, ifilterfalse
+from itertools import zip_longest, filterfalse
 from functools import wraps
 
 from os import path
@@ -61,8 +60,8 @@ def check_types(**kwargs):
     def actual_decorator(func):
         @wraps(func)
         def wrapper(*_args, **_kwargs):
-            argdict = dict(zip(func.func_code.co_varnames, _args), **_kwargs)
-            for arg, obj in kwargs.items():
+            argdict = dict(list(zip(func.__code__.co_varnames, _args)), **_kwargs)
+            for arg, obj in list(kwargs.items()):
                 if arg in argdict and not isinstance(argdict[arg], obj):
                     raise TypeError('"{}" must be an instance of {}'.format(arg, obj))
 
@@ -84,11 +83,6 @@ def reconcile(current, desired):
     return to_add, to_remove
 
 
-def prettify(xmlstr):
-    pretty = xml.dom.minidom.parseString(xmlstr).toprettyxml(indent="    ")
-    return '\n'.join(line.rstrip() for line in pretty.splitlines() if line.strip())
-
-
 @check_types(n=int, fill=bool)
 def grouper(iterable, n, fill=False, fillvalue=None):
     """Collect data into fixed-length chunks or blocks. If ``fill`` is
@@ -97,8 +91,8 @@ def grouper(iterable, n, fill=False, fillvalue=None):
     """
 
     args = [iter(iterable)] * n
-    for chunk in izip_longest(fillvalue=fillvalue, *args):
+    for chunk in zip_longest(fillvalue=fillvalue, *args):
         if fill:
             yield chunk
         else:
-            yield tuple(ifilterfalse(lambda x: x is None, chunk))
+            yield tuple(filterfalse(lambda x: x is None, chunk))

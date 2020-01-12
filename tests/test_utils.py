@@ -6,7 +6,7 @@ import logging
 
 from uwgroups.utils import reconcile, grouper
 
-from __init__ import TestBase
+from .__init__ import TestBase
 log = logging.getLogger(__name__)
 
 
@@ -57,11 +57,11 @@ class TestReconcile(TestBase):
 
 class TestGrouper(TestBase):
     def test01(self):
-        items = range(10)
+        items = list(range(10))
         chunks = list(grouper(items, 4))
-        self.assertEquals(chunks[-1], (8, 9))
+        self.assertEqual(chunks[-1], (8, 9))
 
     def test02(self):
-        items = range(10)
+        items = list(range(10))
         chunks = list(grouper(items, 4, fill=True))
-        self.assertEquals(chunks[-1], (8, 9, None, None))
+        self.assertEqual(chunks[-1], (8, 9, None, None))

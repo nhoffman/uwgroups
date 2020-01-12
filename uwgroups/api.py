@@ -1,22 +1,27 @@
-from __future__ import print_function
+import os
 import errno
 import logging
-import httplib
+import http.client
 from os import path
 import socket
-import xml.etree.ElementTree as ET
 import subprocess
-
-from jinja2 import Environment, PackageLoader
+import json
 
 from uwgroups import package_data
-from uwgroups.utils import reconcile, prettify, grouper, check_types
+from uwgroups.utils import reconcile, grouper, check_types
 
 log = logging.getLogger(__name__)
 
-GWS_HOST = 'iam-ws.u.washington.edu'
+# https://groups.uw.edu/group_sws/v3
+gws_hosts = {
+    'PROD': 'groups.uw.edu',
+    'DEV': 'dev.groups.uw.edu',
+    'EVAL': 'eval.groups.uw.edu',
+}
+
+GWS_HOST = gws_hosts[os.environ.get('GWS_HOST', 'PROD')]
 GWS_PORT = 443
-API_PATH = '/group_sws/v2'
+API_PATH = '/group_sws/v3'
 
 # https://certs.cac.washington.edu/?req=svpem
 UWCA_ROOT = package_data('root.cert')
@@ -39,10 +44,12 @@ def get_admins(certfile):
 
     """
 
-    output = subprocess.check_output(
-        ['openssl', 'x509', '-in', certfile, '-noout', '-subject'])
+    output = subprocess.run(
+        ['openssl', 'x509', '-in', certfile, '-noout', '-subject'],
+        capture_output=True, text=True)
     log.debug(output)
-    data = {k: v.strip() or None for k, v in [e.split('=') for e in output.split('/')]}
+    data = {k: v.strip() or None
+            for k, v in [e.split('=') for e in output.stdout.split('/')]}
 
     dns_user = User(uwnetid=data['CN'], type='dns')
     uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
@@ -82,6 +89,8 @@ class UWGroups(object):
 
         """
 
+        log.info(f'using {GWS_HOST}')
+
         if not certfile or not path.exists(certfile):
             raise ValueError("'certfile' is required and must specify a readable file")
 
@@ -90,7 +99,6 @@ class UWGroups(object):
 
         self.keyfile = keyfile
         self.certfile = certfile
-        self.j2env = Environment(loader=PackageLoader('uwgroups', 'templates'))
         self.admins = get_admins(certfile)
         log.info(self.admins)
         self.timeout = timeout
@@ -101,10 +109,10 @@ class UWGroups(object):
         overrides the value for ``timeout`` in the class constructor.
 
         """
-        self.context = httplib.ssl.create_default_context()
+        self.context = http.client.ssl.create_default_context()
         self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
-        self.connection = httplib.HTTPSConnection(
+        self.connection = http.client.HTTPSConnection(
             host=GWS_HOST,
             timeout=timeout or self.timeout,
             port=GWS_PORT,
@@ -127,8 +135,8 @@ class UWGroups(object):
         self.close()
         self.connect()
 
-    @check_types(method=basestring, endpoint=basestring, headers=dict,
-                 body=basestring, expect_status=int, attempts=int)
+    @check_types(method=str, endpoint=str, headers=dict,
+                 body=str, expect_status=int, attempts=int)
     def _request(self, method, endpoint, headers=None, body=None, expect_status=200,
                  attempts=5):
         methods = {'GET', 'PUT', 'DELETE'}
@@ -147,11 +155,11 @@ class UWGroups(object):
             try:
                 self.connection.request(method, url, **args)
                 response = self.connection.getresponse()
-            except httplib.BadStatusLine, err:
+            except http.client.BadStatusLine as err:
                 caught_err = err
                 log.warning('failure on attempt {}: {}'.format(attempt, err))
                 self.reset()
-            except socket.error, err:
+            except socket.error as err:
                 caught_err = err
                 if err.errno != errno.ETIMEDOUT:
                     log.warning('failure on attempt {}: {}'.format(attempt, err))
@@ -179,16 +187,30 @@ class UWGroups(object):
         body = response.read()
         return body
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
+    def group_exists(self, group_name):
+        """Return True if the group exists"""
+        try:
+            self.get_group(group_name)
+        except MissingResourceError:
+            # closing and reopening the connection seems to be
+            # necessary to prevent an httplib.ResponseNotReady error
+            # after an exception caused by a missing group.
+            self.reset()
+            return False
+        else:
+            return True
+
+    @check_types(group_name=str)
     def get_group(self, group_name):
-        """Return an xml representation of a group"""
+        """Return deserialized json representation of a group"""
         endpoint = path.join('group', group_name)
         response = self._request(
             'GET', endpoint,
-            headers={"Accept": "text/xml", "Content-Type": "text/xml"})
-        return prettify(response)
+            headers={"Accept": "application/json", "Content-Type": "application/json"})
+        return json.loads(response)
 
-    @check_types(group_name=basestring, admin_users=list)
+    @check_types(group_name=str, admin_users=list)
     def create_group(self, group_name, admin_users=None):
         """Create a group with name ``group_name``. By default, the dns user
         associated with the certificate, as well as the user
@@ -205,34 +227,48 @@ class UWGroups(object):
             for uwnetid in admin_users:
                 admins.append(User(uwnetid, type='uwnetid'))
 
-        template = self.j2env.get_template('create_group.xml')
-        body = template.render(group_name=group_name, admins=admins)
-        log.debug(prettify(body))
+        body = {
+            "data": {
+                "id": group_name,
+                "displayName": group_name,
+                "description": group_name,
+                "contact": "ngh2",
+                "authnfactor": 1,
+                "classification": "u",
+                "admins": [{'id': u.uwnetid, 'type': u.type} for u in admins],
+                "updaters": [],
+                "creators": [],
+                "readers": [],
+                "optins": [],
+                "optouts": [],
+            }
+        }
 
         response = self._request(
             'PUT', endpoint,
-            headers={"Accept": "text/xml", "Content-Type": "text/xml"},
-            body=body,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            body=json.dumps(body),
             expect_status=201)
-        log.debug(prettify(response))
+        log.debug(response)
         return response
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
     def delete_group(self, group_name):
         endpoint = path.join('group', group_name)
         response = self._request('DELETE', endpoint)
         return response
 
-    @check_types(group_name=basestring)
+    @check_types(group_name=str)
     def get_members(self, group_name):
         """Return a list of uwnetids"""
         endpoint = path.join('group', group_name, 'member')
-        response = self._request('GET', endpoint, headers={'accept': 'text/xml'})
-        root = ET.fromstring(response)
-        members = [member.text for member in root.iter('member')]
+        response = self._request(
+            'GET', endpoint, headers={'accept': 'application/json'})
+        data = json.loads(response)['data']
+        members = [d['id'] for d in data]
         return members
 
-    @check_types(group_name=basestring, members=list, batchsize=int)
+    @check_types(group_name=str, members=list, batchsize=int)
     def add_members(self, group_name, members, batchsize=200):
         """Add uwnetids in list ``members`` to the specified group in batches
         of size ``batchsize``.
@@ -242,7 +278,7 @@ class UWGroups(object):
             endpoint = path.join('group', group_name, 'member', ','.join(chunk))
             self._request('PUT', endpoint)
 
-    @check_types(group_name=basestring, members=list, batchsize=int)
+    @check_types(group_name=str, members=list, batchsize=int)
     def delete_members(self, group_name, members, batchsize=200):
         """Remove uwnetids in list ``members`` from the specified group in
         batches of size ``batchsize``.
@@ -252,21 +288,7 @@ class UWGroups(object):
             endpoint = path.join('group', group_name, 'member', ','.join(chunk))
             self._request('DELETE', endpoint)
 
-    @check_types(group_name=basestring)
-    def group_exists(self, group_name):
-        """Return True if the group exists"""
-        try:
-            self.get_group(group_name)
-        except MissingResourceError:
-            # closing and reopening the connection seems to be
-            # necessary to prevent an httplib.ResponseNotReady error
-            # after an exception caused by a missing group.
-            self.reset()
-            return False
-        else:
-            return True
-
-    @check_types(group_name=basestring, members=list)
+    @check_types(group_name=str, members=list)
     def sync_members(self, group_name, members, dry_run=False):
         """Add or remove users from the specified group as necessary so that
         the group contains ``members`` (a list or uwnetids). When
@@ -301,7 +323,7 @@ class UWGroups(object):
             if not dry_run:
                 self.delete_members(group_name, sorted(to_delete))
 
-    @check_types(group_name=basestring, service=basestring, active=bool)
+    @check_types(group_name=str, service=str, active=bool)
     def set_affiliate(self, group_name, service, active=True):
         """Activate (``active=True``) or inactivate (``active=False``)
         Exchange (``service=exchange``) or Google Apps
@@ -311,7 +333,7 @@ class UWGroups(object):
 
         services = {'exchange': 'email', 'google': 'google'}
         if service not in services:
-            raise ValueError('service must be one of {}'.format(services.keys()))
+            raise ValueError('service must be one of {}'.format(list(services.keys())))
         endpoint = path.join('group', group_name, 'affiliate', services[service])
         endpoint += '?status=' + ('active' if active else 'inactive')
         response = self._request('PUT', endpoint)

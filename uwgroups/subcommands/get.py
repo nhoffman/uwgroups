@@ -1,8 +1,9 @@
-"""Get xml representation of a group
+"""Show the API response for information about a group
 """
 
 import logging
-
+import pprint
+import sys
 
 from uwgroups.api import UWGroups
 from uwgroups.subcommands import find_credentials
@@ -17,5 +18,8 @@ def build_parser(parser):
 def action(args):
     certfile, keyfile = find_credentials(args)
     with UWGroups(certfile, keyfile) as conn:
-        body = conn.get_group(args.group_name)
-        print(body)
+        if conn.group_exists(args.group_name):
+            body = conn.get_group(args.group_name)
+            pprint.pprint(body)
+        else:
+            sys.exit(f'group "{args.group_name}" does not exist')

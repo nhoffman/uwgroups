@@ -21,7 +21,7 @@ if verbosity > 1:
 else:
     logformat = '%(message)s'
 
-logging.basicConfig(file=sys.stdout, format=logformat, level=loglevel)
+logging.basicConfig(stream=sys.stdout, format=logformat, level=loglevel)
 log = logging.getLogger(__name__)
 
 # module data

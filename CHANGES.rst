@@ -2,6 +2,16 @@
  changes for uwgroups
 ======================
 
+0.3.0
+=====
+
+* drop python 2.7, support python 3.6+
+* use UW groups API v3
+  (https://wiki.cac.washington.edu/display/infra/Groups+Service+API+v3)
+* use environment variable GWS_HOST to specify API host
+* add subcommand 'members'
+
+
 0.2.5
 =====
 
