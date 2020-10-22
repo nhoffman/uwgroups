@@ -2,6 +2,11 @@
  changes for uwgroups
 ======================
 
+0.3.1
+=====
+
+* add 'environment' parameter to UWGroups() constructor
+
 0.3.0
 =====
 
