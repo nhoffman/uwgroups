@@ -338,3 +338,15 @@ class UWGroups(object):
         endpoint += '?status=' + ('active' if active else 'inactive')
         response = self._request('PUT', endpoint)
         return response
+
+    @check_types(netid=str)
+    def search_user(self, netid):
+        """Return groups in which `netid` is a member
+
+        """
+
+        endpoint = f'search?member={netid}'
+        response = self._request('GET', endpoint)
+        data = json.loads(response)['data']
+        groups = [d['id'] for d in data]
+        return groups

@@ -2,6 +2,11 @@
  changes for uwgroups
 ======================
 
+0.3.2
+=====
+
+* add 'UWGroups.search_user()' method and corresponding subcommand
+
 0.3.1
 =====
 
@@ -16,7 +21,6 @@
 * use environment variable GWS_HOST to specify API host
 * add subcommand 'members'
 
-
 0.2.5
 =====
 
@@ -26,7 +30,6 @@
 =====
 
 * Better handling of timeout errors.
-
 
 0.2.3
 =====
