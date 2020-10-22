@@ -2,6 +2,7 @@
 Assembles subcommands and provides top-level script.
 """
 
+import os
 import argparse
 from argparse import RawDescriptionHelpFormatter
 import logging
@@ -11,6 +12,7 @@ from importlib import import_module
 from uwgroups import (subcommands, __version__ as version,
                       __doc__ as docstring,
                       cert_var_name, key_var_name)
+from uwgroups.api import GWS_HOSTS
 
 
 def parse_arguments(argv):
@@ -46,6 +48,10 @@ def parse_arguments(argv):
                         help="""Path to the RSA private key file. May
                         also be specified using the environment variable
                         {}""".format(key_var_name))
+    parser.add_argument('-e', '--environment', choices=list(GWS_HOSTS.keys()),
+                        default=os.environ.get('GWS_HOST', 'PROD'),
+                        help="""Selects UW groups API endpoint; uses GWS_GROUP
+                             environment variable if set [%(default)s]""")
 
     ##########################
     # Setup all sub-commands #

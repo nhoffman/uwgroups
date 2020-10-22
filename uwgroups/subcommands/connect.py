@@ -15,7 +15,7 @@ def build_parser(parser):
 
 def action(args):
     certfile, keyfile = find_credentials(args)
-    with UWGroups(certfile, keyfile) as conn:
+    with UWGroups(certfile, keyfile, environment=args.environment) as conn:
         for attr in ['host', 'port']:
             print(('{}: {}'.format(attr, getattr(conn.connection, attr))))
         for attr in ['certfile', 'keyfile']:

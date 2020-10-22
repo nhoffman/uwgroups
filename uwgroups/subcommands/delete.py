@@ -15,5 +15,5 @@ def build_parser(parser):
 
 def action(args):
     certfile, keyfile = find_credentials(args)
-    with UWGroups(certfile, keyfile) as conn:
+    with UWGroups(certfile, keyfile, environment=args.environment) as conn:
         conn.delete_group(args.group_name)

@@ -13,13 +13,12 @@ from uwgroups.utils import reconcile, grouper, check_types
 log = logging.getLogger(__name__)
 
 # https://groups.uw.edu/group_sws/v3
-gws_hosts = {
+GWS_HOSTS = {
     'PROD': 'groups.uw.edu',
     'DEV': 'dev.groups.uw.edu',
     'EVAL': 'eval.groups.uw.edu',
 }
 
-GWS_HOST = gws_hosts[os.environ.get('GWS_HOST', 'PROD')]
 GWS_PORT = 443
 API_PATH = '/group_sws/v3'
 
@@ -84,12 +83,13 @@ class UWGroups(object):
 
     """
 
-    def __init__(self, certfile, keyfile=None, timeout=30):
+    def __init__(self, certfile, keyfile=None, environment='PROD', timeout=30):
         """Initialize the connection.
 
         """
 
-        log.info(f'using {GWS_HOST}')
+        self.gws_host = GWS_HOSTS[environment]
+        log.info(f'using {self.gws_host}')
 
         if not certfile or not path.exists(certfile):
             raise ValueError("'certfile' is required and must specify a readable file")
@@ -113,11 +113,11 @@ class UWGroups(object):
         self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
         self.connection = http.client.HTTPSConnection(
-            host=GWS_HOST,
+            host=self.gws_host,
             timeout=timeout or self.timeout,
             port=GWS_PORT,
             context=self.context)
-        log.info('connected to {}:{}'.format(GWS_HOST, GWS_PORT))
+        log.info(f'connected to {self.gws_host}:{GWS_PORT}')
 
     def __enter__(self):
         self.connect()

@@ -22,6 +22,6 @@ def action(args):
     certfile, keyfile = find_credentials(args)
     groupdict = json.load(args.groupfile)
 
-    with UWGroups(certfile, keyfile) as conn:
+    with UWGroups(certfile, keyfile, environment=args.environment) as conn:
         for group_name, members in sorted(groupdict.items()):
             conn.sync_members(group_name, members, dry_run=args.dry_run)

@@ -17,7 +17,7 @@ def build_parser(parser):
 
 def action(args):
     certfile, keyfile = find_credentials(args)
-    with UWGroups(certfile, keyfile) as conn:
+    with UWGroups(certfile, keyfile, environment=args.environment) as conn:
         if conn.group_exists(args.group_name):
             members = conn.get_members(args.group_name)
             for m in sorted(members):

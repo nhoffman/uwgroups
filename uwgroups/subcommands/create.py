@@ -16,7 +16,7 @@ def build_parser(parser):
 
 def action(args):
     certfile, keyfile = find_credentials(args)
-    with UWGroups(certfile, keyfile) as conn:
+    with UWGroups(certfile, keyfile, environment=args.environment) as conn:
         conn.create_group(args.group_name)
         conn.set_affiliate(
             args.group_name, service='exchange', active=args.exchange == 'yes')
