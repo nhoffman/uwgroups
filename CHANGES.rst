@@ -2,6 +2,11 @@
  changes for uwgroups
 ======================
 
+0.3.3
+=====
+
+* fix error parsing output of openssl
+
 0.3.2
 =====
 
