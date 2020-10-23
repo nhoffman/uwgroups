@@ -46,9 +46,18 @@ def get_admins(certfile):
     output = subprocess.run(
         ['openssl', 'x509', '-in', certfile, '-noout', '-subject'],
         capture_output=True, text=True)
-    log.debug(output)
-    data = {k: v.strip() or None
-            for k, v in [e.split('=') for e in output.stdout.split('/')]}
+    log.info(output)
+
+    # openssl and libressl have differently-formatted outputs:
+    # LibreSSL 2.8.3
+    # subject= /C=US/ST=Washington/L=Seattle/O=University of Washington/OU=Laboratory Medicine/CN=elmira.labmed.uw.edu/emailAddress=ngh2@uw.edu
+    # openssl
+    # subject=C = US, ST = Washington, L = Seattle, O = University of Washington, OU = Laboratory Medicine, CN = elmira.labmed.uw.edu, emailAddress = ngh2@uw.edu
+
+    text = output.stdout.replace('subject=', '').strip()
+    char = '/' if text.startswith('/') else ','
+    data = {k.strip(): v.strip()
+            for k, v in [e.split('=') for e in text.strip(char).split(char)]}
 
     dns_user = User(uwnetid=data['CN'], type='dns')
     uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
