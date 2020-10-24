@@ -2,6 +2,12 @@
  changes for uwgroups
 ======================
 
+0.3.4
+=====
+
+* add subcommands to add and remove users from groups
+* recursively create parent groups on group creation
+
 0.3.3
 =====
 
