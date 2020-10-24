@@ -221,14 +221,30 @@ class UWGroups(object):
 
     @check_types(group_name=str, admin_users=list)
     def create_group(self, group_name, admin_users=None):
-        """Create a group with name ``group_name``. By default, the dns user
+        """Create a group with name ``group_name``. The dns user
         associated with the certificate, as well as the user
         identified as the email contact for the cert in field
-        ``emailAddress`` are added as admins. A list of additional
-        admin users identified by uwnetid can be provided in
-        ``admin_users``.
+        ``emailAddress`` are always added as admins. A list of
+        additional admin users identified by uwnetid can be provided
+        in ``admin_users``.
+
+        Note that the API requires that a parent group ('root_parent')
+        must be created before any of its children
+        ('root_parent_child'). This method will recursively create
+        parent groups if necessary.
 
         """
+
+        if self.group_exists(group_name):
+            log.info(f'group {group_name} exists, skipping creation')
+            return {}
+
+        # create parents as necessary, skipping the first (root) group
+        hierarchy = group_name.split('_')
+        for i in range(2, len(hierarchy)):
+            parent = '_'.join(hierarchy[:i])
+            self.create_group(parent, admin_users=admin_users or [])
+
         endpoint = path.join('group', group_name)
 
         admins = self.admins[:]
