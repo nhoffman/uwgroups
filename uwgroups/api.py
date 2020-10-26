@@ -1,4 +1,3 @@
-import os
 import errno
 import logging
 import http.client
