@@ -294,7 +294,7 @@ class UWGroups(object):
         return members
 
     @check_types(group_name=str, members=list, batchsize=int)
-    def add_members(self, group_name, members, batchsize=200):
+    def add_members(self, group_name, members, batchsize=50):
         """Add uwnetids in list ``members`` to the specified group in batches
         of size ``batchsize``.
 
@@ -304,7 +304,7 @@ class UWGroups(object):
             self._request('PUT', endpoint)
 
     @check_types(group_name=str, members=list, batchsize=int)
-    def delete_members(self, group_name, members, batchsize=200):
+    def delete_members(self, group_name, members, batchsize=50):
         """Remove uwnetids in list ``members`` from the specified group in
         batches of size ``batchsize``.
 
