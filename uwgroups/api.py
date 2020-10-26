@@ -313,7 +313,7 @@ class UWGroups(object):
             self._request('DELETE', endpoint)
 
     @check_types(group_name=str, members=list)
-    def sync_members(self, group_name, members, dry_run=False):
+    def sync_members(self, group_name, members, batchsize=50, dry_run=False):
         """Add or remove users from the specified group as necessary so that
         the group contains ``members`` (a list or uwnetids). When
         ``dry_run`` is True, log the necessary actions but don't
@@ -340,12 +340,12 @@ class UWGroups(object):
         if to_add:
             log.info('[+] {}: {}'.format(group_name, ','.join(to_add)))
             if not dry_run:
-                self.add_members(group_name, sorted(to_add))
+                self.add_members(group_name, sorted(to_add), batchsize=batchsize)
 
         if to_delete:
             log.info('[-] {}: {}'.format(group_name, ','.join(to_delete)))
             if not dry_run:
-                self.delete_members(group_name, sorted(to_delete))
+                self.delete_members(group_name, sorted(to_delete), batchsize=batchsize)
 
     @check_types(group_name=str, service=str, active=bool)
     def set_affiliate(self, group_name, service, active=True):
