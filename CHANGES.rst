@@ -2,6 +2,12 @@
  changes for uwgroups
 ======================
 
+0.3.5
+=====
+
+* add batchsize parameter to UWGroups.sync_members()
+* change default batchsize to 50
+
 0.3.4
 =====
 
