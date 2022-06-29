@@ -2,6 +2,12 @@
  changes for uwgroups
 ======================
 
+0.3.6
+=====
+
+* Work around error caused by 1024 bit UWCA root cert
+  (ssl.SSLError: [SSL: CA_KEY_TOO_SMALL] ca key too small (_ssl.c:2633))
+
 0.3.5
 =====
 

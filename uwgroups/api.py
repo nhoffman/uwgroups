@@ -84,6 +84,11 @@ class UWGroups(object):
     the certificate and private keys, respectively. ``timeout`` is
     passed to ``httplib.HTTPSConnection()``
 
+    As of 2022-06-28, the UWCA root cert is only 1024 bytes, which results in the error
+    'ssl.SSLError: [SSL: CA_KEY_TOO_SMALL] ca key too small (_ssl.c:2633)'
+    on ubuntu and debian. By default, the connection is initialized with
+    context.set_ciphers('DEFAULT@SECLEVEL=1') unless use_default_ciphers is True
+
     Example::
 
         with UWGroups(certfile='/path/to/cert.pem') as conn:
@@ -91,7 +96,8 @@ class UWGroups(object):
 
     """
 
-    def __init__(self, certfile, keyfile=None, environment='PROD', timeout=30):
+    def __init__(self, certfile, keyfile=None, environment='PROD', timeout=30,
+                 use_default_ciphers=False):
         """Initialize the connection.
 
         """
@@ -110,16 +116,18 @@ class UWGroups(object):
         self.admins = get_admins(certfile)
         log.info(self.admins)
         self.timeout = timeout
+        self.use_default_ciphers = use_default_ciphers
 
     def connect(self, timeout=None):
         """Establish a connection. If the ``UWGroups`` object is instantiated
         without a with block, must be called explicitly. ``timeout``
         overrides the value for ``timeout`` in the class constructor.
-
         """
         self.context = http.client.ssl.create_default_context()
         self.context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.context.load_verify_locations(UWCA_ROOT)
+        if not self.use_default_ciphers:
+            self.context.set_ciphers('DEFAULT@SECLEVEL=1')
         self.connection = http.client.HTTPSConnection(
             host=self.gws_host,
             timeout=timeout or self.timeout,
