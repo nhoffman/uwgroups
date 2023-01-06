@@ -395,3 +395,16 @@ class UWGroups(object):
         data = json.loads(response)['data']
         groups = [d['id'] for d in data]
         return groups
+
+    @check_types(name=str)
+    def search_groups(self, name):
+        """Return a list of group names matching pattern `name` (may
+        contain * as a wildcard).
+
+        """
+
+        endpoint = f'search?name={name}'
+        response = self._request('GET', endpoint)
+        data = json.loads(response)['data']
+        groups = [d['id'] for d in data]
+        return groups
