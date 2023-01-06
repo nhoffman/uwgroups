@@ -2,6 +2,12 @@
  changes for uwgroups
 ======================
 
+0.3.7
+=====
+
+* add UWGroups.search_group() to return a list of group names based on
+  a pattern.
+
 0.3.6
 =====
 
