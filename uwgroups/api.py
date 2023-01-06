@@ -59,7 +59,8 @@ def get_admins(certfile):
             for k, v in [e.split('=') for e in text.strip(char).split(char)]}
 
     dns_user = User(uwnetid=data['CN'], type='dns')
-    uwnetid_user = User(uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
+    uwnetid_user = User(
+        uwnetid=data['emailAddress'].split('@')[0], type='uwnetid')
 
     return [dns_user, uwnetid_user]
 
@@ -84,7 +85,9 @@ class UWGroups(object):
     the certificate and private keys, respectively. ``timeout`` is
     passed to ``httplib.HTTPSConnection()``
 
-    As of 2022-06-28, the UWCA root cert is only 1024 bytes, which results in the error
+    As of 2022-06-28, the UWCA root cert is only 1024 bytes, which
+    results in the error
+
     'ssl.SSLError: [SSL: CA_KEY_TOO_SMALL] ca key too small (_ssl.c:2633)'
     on ubuntu and debian. By default, the connection is initialized with
     context.set_ciphers('DEFAULT@SECLEVEL=1') unless use_default_ciphers is True
@@ -106,7 +109,8 @@ class UWGroups(object):
         log.info(f'using {self.gws_host}')
 
         if not certfile or not path.exists(certfile):
-            raise ValueError("'certfile' is required and must specify a readable file")
+            raise ValueError(
+                "'certfile' is required and must specify a readable file")
 
         if keyfile and not path.exists(keyfile):
             raise ValueError("'keyfile' must specify a readable file")
@@ -117,6 +121,8 @@ class UWGroups(object):
         log.info(self.admins)
         self.timeout = timeout
         self.use_default_ciphers = use_default_ciphers
+        self.context = None
+        self.connection = None
 
     def connect(self, timeout=None):
         """Establish a connection. If the ``UWGroups`` object is instantiated
@@ -147,17 +153,19 @@ class UWGroups(object):
         self.connection.close()
 
     def reset(self):
-        """Close and reopen the connection; may be necessary after an exception"""
+        """Close and reopen the connection; may be necessary after an
+        exception"""
         self.close()
         self.connect()
 
     @check_types(method=str, endpoint=str, headers=dict,
                  body=str, expect_status=int, attempts=int)
-    def _request(self, method, endpoint, headers=None, body=None, expect_status=200,
-                 attempts=5):
+    def _request(self, method, endpoint, headers=None, body=None,
+                 expect_status=200, attempts=5):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
-            raise ValueError('method must be one of {}'.format(', '.join(methods)))
+            raise ValueError(
+                'method must be one of {}'.format(', '.join(methods)))
 
         url = path.join(API_PATH, endpoint)
 
@@ -179,7 +187,8 @@ class UWGroups(object):
                 caught_err = err
                 if err.errno != errno.ETIMEDOUT:
                     log.warning('failure on attempt {}: {}'.format(attempt, err))
-                    # response isn't set at all for this case, reraise the exception.
+                    # response isn't set at all for this case, reraise
+                    # the exception.
                     raise
                 self.reset()
             else:
@@ -223,7 +232,8 @@ class UWGroups(object):
         endpoint = path.join('group', group_name)
         response = self._request(
             'GET', endpoint,
-            headers={"Accept": "application/json", "Content-Type": "application/json"})
+            headers={"Accept": "application/json",
+                     "Content-Type": "application/json"})
         return json.loads(response)
 
     @check_types(group_name=str, admin_users=list)
@@ -278,7 +288,8 @@ class UWGroups(object):
 
         response = self._request(
             'PUT', endpoint,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers={"Accept": "application/json",
+                     "Content-Type": "application/json"},
             body=json.dumps(body),
             expect_status=201)
         log.debug(response)
@@ -353,7 +364,8 @@ class UWGroups(object):
         if to_delete:
             log.info('[-] {}: {}'.format(group_name, ','.join(to_delete)))
             if not dry_run:
-                self.delete_members(group_name, sorted(to_delete), batchsize=batchsize)
+                self.delete_members(
+                    group_name, sorted(to_delete), batchsize=batchsize)
 
     @check_types(group_name=str, service=str, active=bool)
     def set_affiliate(self, group_name, service, active=True):
@@ -365,7 +377,8 @@ class UWGroups(object):
 
         services = {'exchange': 'email', 'google': 'google'}
         if service not in services:
-            raise ValueError('service must be one of {}'.format(list(services.keys())))
+            raise ValueError('service must be one of {}'.format(
+                list(services.keys())))
         endpoint = path.join('group', group_name, 'affiliate', services[service])
         endpoint += '?status=' + ('active' if active else 'inactive')
         response = self._request('PUT', endpoint)
