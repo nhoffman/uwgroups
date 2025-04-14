@@ -311,6 +311,34 @@ class UWGroups(object):
         members = [d['id'] for d in data]
         return members
 
+    @check_types(group_name=str)
+    def get_member_details(self, group_name):
+        """Return details of response describing members of the group"""
+        endpoint = path.join('group', group_name, 'member')
+        response = self._request(
+            'GET', endpoint, headers={'accept': 'application/json'})
+        data = json.loads(response)['data']
+        return data
+
+    @check_types(group_name=str, member=str)
+    def is_member(self, group_name, member):
+        """Retutn True if `member` is a member of `group_name`"""
+        if not self.group_exists(group_name):
+            raise ValueError(f'group {group_name} does not exist')
+
+        endpoint = path.join('group', group_name, 'member', member)
+        try:
+            response = self._request(
+                'GET', endpoint, headers={'accept': 'application/json'})
+        except MissingResourceError:
+            # closing and reopening the connection seems to be
+            # necessary to prevent an httplib.ResponseNotReady error
+            # after an exception caused by a missing group.
+            self.reset()
+            return False
+        else:
+            return True
+
     @check_types(group_name=str, members=list, batchsize=int)
     def add_members(self, group_name, members, batchsize=50):
         """Add uwnetids in list ``members`` to the specified group in batches
