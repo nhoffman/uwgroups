@@ -138,3 +138,35 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Guarded background workers
+==========================
+
+The client accepts optional controls for cancellable, scoped background work::
+
+    with UWGroups(
+        certfile,
+        request_check=check_lease,
+        request_attempts=1,
+        write_prefix='u_labmed_',
+    ) as groups:
+        groups.add_members('u_labmed_staff', ['alice'])
+
+``request_check`` is a no-argument callable invoked before every HTTP attempt,
+including reads, retries, member batches, and recursive parent creation. Any
+exception it raises propagates unchanged and prevents that request. It cannot
+cancel a request already in flight. Keep network timeouts bounded.
+
+``request_attempts`` defaults to 5 for existing callers. Use 1 when the caller
+retries entire reconciliations after rereading remote state. A per-request
+``attempts`` argument overrides the configured value.
+
+``write_prefix`` is optional. When set, every mutation must remain within that
+prefix; its root (with trailing underscores removed) is protected. Existing
+ancestors can still be read. Missing ancestors outside the prefix must be
+provisioned separately. Ownership violations raise ``OwnershipError``, an
+``AuthorizationError`` subclass. Use ``restrict_writes(prefix)`` between
+operations to select another namespace, and ``check_write_group(name)`` to
+validate a proposed operation without issuing a request, including in previews.
+Identifier encoding also applies to unrestricted clients and handles member IDs
+containing URL punctuation safely.

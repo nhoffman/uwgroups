@@ -2,6 +2,21 @@
  changes for uwgroups
 ======================
 
+0.4.0 (2026-10-18)
+==================
+
+* Add ``UWGroups.get_member_details()`` and ``UWGroups.is_member()``;
+  expose single-user membership checks through ``check_membership``.
+* Add optional ``request_check`` callbacks, called before every HTTP attempt,
+  including retries, recursive group creation, and membership batches.
+* Add configurable ``request_attempts`` (default 5) and ``write_prefix`` ownership
+  restrictions, with public ``restrict_writes()`` and ``check_write_group()``
+  methods. Existing callers retain unrestricted writes by default.
+* Encode identifiers and search parameters instead of interpolating URL
+  structure. Protect the configured namespace root and unowned ancestors.
+* Consume HTTP error bodies before raising and recognize 403 as an
+  authorization failure, eliminating missing-resource connection resets.
+
 0.3.7
 =====
 
@@ -65,4 +80,3 @@
 
 * add ``timeout`` parameter to ``UWGroups`` constructor and
   ``UWGroups.connect()`` with default of 30s
-

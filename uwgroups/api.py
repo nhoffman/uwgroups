@@ -5,6 +5,8 @@ from os import path
 import socket
 import subprocess
 import json
+import re
+from urllib.parse import quote, unquote, urlencode, urlsplit
 
 from uwgroups import package_data
 from uwgroups.utils import reconcile, grouper, check_types
@@ -35,6 +37,10 @@ class MissingResourceError(APIError):
 
 class AuthorizationError(APIError):
     pass
+
+
+class OwnershipError(AuthorizationError):
+    """A write would exceed the client's configured group namespace."""
 
 
 def get_admins(certfile):
@@ -100,8 +106,14 @@ class UWGroups(object):
     """
 
     def __init__(self, certfile, keyfile=None, environment='PROD', timeout=30,
-                 use_default_ciphers=False):
+                 use_default_ciphers=False, request_check=None,
+                 request_attempts=5, write_prefix=None):
         """Initialize the connection.
+
+        ``request_check`` is called before every HTTP attempt and may raise to
+        cancel work. ``request_attempts`` controls transport retries (default 5).
+        ``write_prefix`` optionally restricts all writes to a group namespace,
+        including writes made while recursively creating parents.
 
         """
 
@@ -123,6 +135,62 @@ class UWGroups(object):
         self.use_default_ciphers = use_default_ciphers
         self.context = None
         self.connection = None
+        if request_check is not None and not callable(request_check):
+            raise TypeError('request_check must be callable')
+        self.request_check = request_check
+        self.request_attempts = self._validate_attempts(request_attempts)
+        self.write_prefix = None
+        if write_prefix is not None:
+            self.restrict_writes(write_prefix)
+
+    @staticmethod
+    def _validate_attempts(attempts):
+        if type(attempts) is not int or attempts < 1:
+            raise ValueError('Request attempts must be a positive integer')
+        return attempts
+
+    def restrict_writes(self, prefix):
+        """Restrict every mutation, including parent creation, to ``prefix``.
+
+        The prefix root (with trailing underscores removed) is protected.
+        Reads remain unrestricted so existing ancestors can be inspected.
+        Call again between operations to select another managed namespace.
+        """
+        if not isinstance(prefix, str) or not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', prefix):
+            raise OwnershipError('A valid nonempty group prefix is required')
+        self.write_prefix = prefix
+
+    def _check_request(self, method, endpoint):
+        if self.request_check is not None:
+            self.request_check()
+        if method == 'GET' or self.write_prefix is None:
+            return
+        parts = urlsplit(endpoint).path.split('/')
+        name = unquote(parts[1]) if len(parts) > 1 else ''
+        if (not parts or parts[0] != 'group'
+                or any(unquote(part) in ('.', '..') for part in parts)):
+            raise OwnershipError('Mutation outside configured group namespace')
+        self.check_write_group(name)
+
+    def check_write_group(self, group_name):
+        """Validate a proposed write, also usable before a dry-run preview."""
+        if self.write_prefix is not None and (
+                not isinstance(group_name, str)
+                or not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', group_name)
+                or not group_name.startswith(self.write_prefix)
+                or group_name == self.write_prefix.rstrip('_')):
+            raise OwnershipError('Mutation outside configured group namespace')
+
+    @staticmethod
+    def _encode_identifier(value):
+        if not isinstance(value, str) or not value or value in ('.', '..'):
+            raise ValueError('A nonempty identifier other than . or .. is required')
+        return quote(value, safe='')
+
+    @classmethod
+    def _group_endpoint(cls, group_name, *segments):
+        # Encode identifiers as path segments, never as URL structure.
+        return '/'.join(['group', cls._encode_identifier(group_name)] + list(segments))
 
     def connect(self, timeout=None):
         """Establish a connection. If the ``UWGroups`` object is instantiated
@@ -161,7 +229,7 @@ class UWGroups(object):
     @check_types(method=str, endpoint=str, headers=dict,
                  body=str, expect_status=int, attempts=int)
     def _request(self, method, endpoint, headers=None, body=None,
-                 expect_status=200, attempts=5):
+                 expect_status=200, attempts=None):
         methods = {'GET', 'PUT', 'DELETE'}
         if method not in methods:
             raise ValueError(
@@ -175,7 +243,12 @@ class UWGroups(object):
         if body:
             args['body'] = body
 
+        attempts = self._validate_attempts(
+            self.request_attempts if attempts is None else attempts)
         for attempt in range(attempts):
+            # This must run outside the retry handler: cancellation exceptions
+            # propagate unchanged, including before every member batch/retry.
+            self._check_request(method, endpoint)
             try:
                 self.connection.request(method, url, **args)
                 response = self.connection.getresponse()
@@ -202,14 +275,16 @@ class UWGroups(object):
         msg = '{} {}: {} {}'.format(method, url, response.status, response.reason)
         log.info(msg)
 
+        # Consume error bodies too, keeping the HTTP connection usable for the
+        # next request after a missing resource or authorization failure.
+        body = response.read()
         if response.status == 404:
             raise MissingResourceError(msg)
-        elif response.status == 401:
+        elif response.status in (401, 403):
             raise AuthorizationError(msg)
         elif response.status != expect_status:
             raise APIError(msg)
 
-        body = response.read()
         return body
 
     @check_types(group_name=str)
@@ -218,10 +293,6 @@ class UWGroups(object):
         try:
             self.get_group(group_name)
         except MissingResourceError:
-            # closing and reopening the connection seems to be
-            # necessary to prevent an httplib.ResponseNotReady error
-            # after an exception caused by a missing group.
-            self.reset()
             return False
         else:
             return True
@@ -229,7 +300,7 @@ class UWGroups(object):
     @check_types(group_name=str)
     def get_group(self, group_name):
         """Return deserialized json representation of a group"""
-        endpoint = path.join('group', group_name)
+        endpoint = self._group_endpoint(group_name)
         response = self._request(
             'GET', endpoint,
             headers={"Accept": "application/json",
@@ -262,7 +333,7 @@ class UWGroups(object):
             parent = '_'.join(hierarchy[:i])
             self.create_group(parent, admin_users=admin_users or [])
 
-        endpoint = path.join('group', group_name)
+        endpoint = self._group_endpoint(group_name)
 
         admins = self.admins[:]
         if admin_users:
@@ -297,14 +368,14 @@ class UWGroups(object):
 
     @check_types(group_name=str)
     def delete_group(self, group_name):
-        endpoint = path.join('group', group_name)
+        endpoint = self._group_endpoint(group_name)
         response = self._request('DELETE', endpoint)
         return response
 
     @check_types(group_name=str)
     def get_members(self, group_name):
         """Return a list of uwnetids"""
-        endpoint = path.join('group', group_name, 'member')
+        endpoint = self._group_endpoint(group_name, 'member')
         response = self._request(
             'GET', endpoint, headers={'accept': 'application/json'})
         data = json.loads(response)['data']
@@ -314,7 +385,7 @@ class UWGroups(object):
     @check_types(group_name=str)
     def get_member_details(self, group_name):
         """Return details of response describing members of the group"""
-        endpoint = path.join('group', group_name, 'member')
+        endpoint = self._group_endpoint(group_name, 'member')
         response = self._request(
             'GET', endpoint, headers={'accept': 'application/json'})
         data = json.loads(response)['data']
@@ -326,15 +397,11 @@ class UWGroups(object):
         if not self.group_exists(group_name):
             raise ValueError(f'group {group_name} does not exist')
 
-        endpoint = path.join('group', group_name, 'member', member)
+        endpoint = self._group_endpoint(group_name, 'member', self._encode_identifier(member))
         try:
-            response = self._request(
+            self._request(
                 'GET', endpoint, headers={'accept': 'application/json'})
         except MissingResourceError:
-            # closing and reopening the connection seems to be
-            # necessary to prevent an httplib.ResponseNotReady error
-            # after an exception caused by a missing group.
-            self.reset()
             return False
         else:
             return True
@@ -346,7 +413,8 @@ class UWGroups(object):
 
         """
         for chunk in grouper(members, batchsize):
-            endpoint = path.join('group', group_name, 'member', ','.join(chunk))
+            endpoint = self._group_endpoint(
+                group_name, 'member', ','.join(self._encode_identifier(member) for member in chunk))
             self._request('PUT', endpoint)
 
     @check_types(group_name=str, members=list, batchsize=int)
@@ -356,7 +424,8 @@ class UWGroups(object):
 
         """
         for chunk in grouper(members, batchsize):
-            endpoint = path.join('group', group_name, 'member', ','.join(chunk))
+            endpoint = self._group_endpoint(
+                group_name, 'member', ','.join(self._encode_identifier(member) for member in chunk))
             self._request('DELETE', endpoint)
 
     @check_types(group_name=str, members=list)
@@ -374,7 +443,6 @@ class UWGroups(object):
         try:
             current_members = set(self.get_members(group_name))
         except MissingResourceError:
-            self.reset()
             current_members = set()
             log.warning('creating group {}'.format(group_name))
             if not dry_run:
@@ -407,7 +475,7 @@ class UWGroups(object):
         if service not in services:
             raise ValueError('service must be one of {}'.format(
                 list(services.keys())))
-        endpoint = path.join('group', group_name, 'affiliate', services[service])
+        endpoint = self._group_endpoint(group_name, 'affiliate', services[service])
         endpoint += '?status=' + ('active' if active else 'inactive')
         response = self._request('PUT', endpoint)
         return response
@@ -418,7 +486,7 @@ class UWGroups(object):
 
         """
 
-        endpoint = f'search?member={netid}'
+        endpoint = 'search?' + urlencode({'member': netid})
         response = self._request('GET', endpoint)
         data = json.loads(response)['data']
         groups = [d['id'] for d in data]
@@ -431,7 +499,7 @@ class UWGroups(object):
 
         """
 
-        endpoint = f'search?name={name}'
+        endpoint = 'search?' + urlencode({'name': name})
         response = self._request('GET', endpoint)
         data = json.loads(response)['data']
         groups = [d['id'] for d in data]
